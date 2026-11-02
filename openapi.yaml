@@ -1,0 +1,572 @@
+openapi: 3.1.0
+info:
+  title: Home / Office / Recurring Location Inference
+  version: 0.1.0-draft
+  description: |
+    CP1 contract for mentor review. No HTTP implementation exists.
+    Synchronous inference for one user's GPS history; POI means recurring location,
+    not a business category. Scores are uncalibrated heuristic evidence, not probabilities.
+    Unknown roles are successful completed inferences (200), including empty inputs.
+    Proposed limits: 100000 points, 20 MiB decoded JSON body, 20000 stay events,
+    60-second processing deadline; these service limits require mentor review and load tests.
+    UTC input is required. Behavioral timezone is explicit and never inferred from coordinates.
+    No dataset paths, URLs, cross-user requests or server-side file access are accepted.
+    Production must use HTTPS, authentication, authorization for user_id, request size limits,
+    no coordinate logging, no shared response caching, and no persistence by default.
+    Deployment and enforcement belong to later approved API work.
+x-mentor-approval: pending
+tags:
+  - name: locations
+security:
+  - bearerAuth: []
+paths:
+  /v1/locations/infer:
+    post:
+      tags: [locations]
+      operationId: inferLocationsV1
+      summary: Infer likely Home, Office and recurring locations for one user
+      description: |
+        Proposal only. Point ordering is normalized per trajectory. Each trajectory_id
+        identifies a recording boundary; it must not be reused for unrelated recordings.
+        Equal timestamp/coordinate duplicates are deduplicated; conflicting equal timestamps
+        use a deterministic coordinate tie break and are counted in diagnostics.
+        No continuity is inferred between trajectory IDs or across excessive sampling gaps.
+        A candidate may serve both Home and Office. Either or both roles may be unknown.
+        Scores describe evidence under assumptions, never verified residence or employment.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InferenceRequest'
+            examples:
+              shortStop:
+                summary: Synthetic 10-minute stop; insufficient recurrence for either role
+                value:
+                  user_id: synthetic-user
+                  model_version: dbscan-v1
+                  config:
+                    timezone: Asia/Shanghai
+                  points:
+                    - {trajectory_id: t1, latitude: 39.9, longitude: 116.3, timestamp: '2024-01-01T00:00:00Z'}
+                    - {trajectory_id: t1, latitude: 39.9, longitude: 116.3, timestamp: '2024-01-01T00:05:00Z'}
+                    - {trajectory_id: t1, latitude: 39.9, longitude: 116.3, timestamp: '2024-01-01T00:10:00Z'}
+              empty:
+                summary: Valid empty input returns completed inference with unknown roles
+                value: {user_id: synthetic-user, points: []}
+      responses:
+        '200':
+          description: Completed, including insufficient evidence and unknown roles
+          headers:
+            Cache-Control:
+              description: Must be no-store for sensitive location results
+              schema: {type: string, const: no-store}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InferenceResponse'
+              examples:
+                insufficientData:
+                  summary: Synthetic empty input; valid completed inference with unknown roles
+                  value:
+                    inference_id: 01c33de4-fd82-5e48-b778-ffac02b00c1c
+                    user_id: synthetic-user
+                    model_version: dbscan-v1
+                    pipeline_version: 0.1.0
+                    status: completed
+                    timezone: Asia/Shanghai
+                    config:
+                      timezone: Asia/Shanghai
+                      distance_m: 100.0
+                      min_stay_minutes: 10.0
+                      max_gap_minutes: 5.0
+                      eps_m: 100.0
+                      min_samples: 3
+                      speed_warning_mps: 100.0
+                      night_start_hour: 22
+                      night_end_hour: 6
+                      work_start_hour: 9
+                      work_end_hour: 18
+                      min_role_days: 3
+                      min_office_weeks: 2
+                      min_role_dwell_minutes: 60.0
+                      min_evidence_score: 0.5
+                      min_candidate_share: 0.5
+                      min_poi_days: 3
+                      max_pois: 10
+                    score_semantics: Uncalibrated heuristic evidence score in [0,1]; not a probability.
+                    home:
+                      status: unknown
+                      reason: insufficient_evidence
+                      candidate: null
+                      alternatives: []
+                    office:
+                      status: unknown
+                      reason: insufficient_evidence
+                      candidate: null
+                      alternatives: []
+                    pois: []
+                    locations: []
+                    coverage:
+                      observed_minutes: 0.0
+                      observed_days: 0
+                      calendar_span_days: 0
+                      observed_day_fraction: 0.0
+                      observed_time_fraction: 0.0
+                      night_observed_days: 0
+                      work_observed_days: 0
+                      first_timestamp: null
+                      last_timestamp: null
+                    diagnostics:
+                      input_points: 0
+                      invalid_coordinates: 0
+                      invalid_timestamps: 0
+                      invalid_rows_removed: 0
+                      invalid_altitudes: 0
+                      duplicate_records_removed: 0
+                      conflicting_timestamps_removed: 0
+                      gaps_over_limit: 0
+                      high_speed_segments: 0
+                      output_points: 0
+                      overlapping_stays_removed: 0
+                      stay_events: 0
+                      location_clusters: 0
+                      noise_stays: 0
+                      noise_proportion: 0.0
+                    warnings:
+                    - timezone_is_user_selected_assumption
+                    - evidence_score_is_not_probability
+                    - sparse_observation_days
+                sharedHomeOffice:
+                  summary: Synthetic repeated day/night observations; both roles share a location,
+                    not ground truth
+                  value:
+                    inference_id: 6378858a-ca91-5bd7-ab53-4a986212eb6a
+                    user_id: synthetic-user
+                    model_version: dbscan-v1
+                    pipeline_version: 0.1.0
+                    status: completed
+                    timezone: Asia/Shanghai
+                    config:
+                      timezone: Asia/Shanghai
+                      distance_m: 100.0
+                      min_stay_minutes: 10.0
+                      max_gap_minutes: 5.0
+                      eps_m: 100.0
+                      min_samples: 3
+                      speed_warning_mps: 100.0
+                      night_start_hour: 22
+                      night_end_hour: 6
+                      work_start_hour: 9
+                      work_end_hour: 18
+                      min_role_days: 3
+                      min_office_weeks: 2
+                      min_role_dwell_minutes: 60.0
+                      min_evidence_score: 0.5
+                      min_candidate_share: 0.5
+                      min_poi_days: 3
+                      max_pois: 10
+                    score_semantics: Uncalibrated heuristic evidence score in [0,1]; not a probability.
+                    home:
+                      status: predicted
+                      reason: sufficient_heuristic_evidence
+                      candidate:
+                        cluster_id: 0
+                        latitude: 39.9
+                        longitude: 116.30000000000001
+                        evidence_score: 0.975
+                        evidence_components:
+                          recurrence: 1.0
+                          duration: 1.0
+                          temporal_consistency: 1.0
+                          coverage: 0.8333333333333334
+                          relative_strength: 1.0
+                        role_dwell_minutes: 600.0
+                        role_visit_days: 5
+                        relative_share: 1.0
+                        eligible: true
+                      alternatives: []
+                    office:
+                      status: predicted
+                      reason: sufficient_heuristic_evidence
+                      candidate:
+                        cluster_id: 0
+                        latitude: 39.9
+                        longitude: 116.30000000000001
+                        evidence_score: 0.975
+                        evidence_components:
+                          recurrence: 1.0
+                          duration: 1.0
+                          temporal_consistency: 1.0
+                          coverage: 0.8333333333333334
+                          relative_strength: 1.0
+                        role_dwell_minutes: 600.0
+                        role_visit_days: 5
+                        relative_share: 1.0
+                        eligible: true
+                      alternatives: []
+                    pois: []
+                    locations:
+                    - user_id: synthetic-user
+                      cluster_id: 0
+                      latitude: 39.9
+                      longitude: 116.30000000000001
+                      stay_event_count: 10
+                      total_dwell_minutes: 1200.0
+                      night_dwell_minutes: 600.0
+                      weekday_dwell_minutes: 1200.0
+                      weekday_daytime_dwell_minutes: 600.0
+                      weekend_dwell_minutes: 0.0
+                      visit_count: 10
+                      unique_visit_days: 7
+                      distinct_weeks: 2
+                      night_visit_days: 5
+                      weekday_daytime_visit_days: 5
+                      weekday_daytime_weeks: 2
+                      mean_visit_duration: 120.0
+                      radius_max_m: 0.0
+                      radius_p95_m: 0.0
+                      observation_coverage: 1.0
+                    coverage:
+                      observed_minutes: 1200.0
+                      observed_days: 7
+                      calendar_span_days: 10
+                      observed_day_fraction: 0.7
+                      observed_time_fraction: 0.09615384615384616
+                      night_observed_days: 5
+                      work_observed_days: 5
+                      first_timestamp: '2024-01-01T02:00:00+00:00'
+                      last_timestamp: '2024-01-09T18:00:00+00:00'
+                    diagnostics:
+                      input_points: 250
+                      invalid_coordinates: 0
+                      invalid_timestamps: 0
+                      invalid_rows_removed: 0
+                      invalid_altitudes: 0
+                      duplicate_records_removed: 0
+                      conflicting_timestamps_removed: 0
+                      gaps_over_limit: 0
+                      high_speed_segments: 0
+                      output_points: 250
+                      overlapping_stays_removed: 0
+                      stay_events: 10
+                      location_clusters: 1
+                      noise_stays: 0
+                      noise_proportion: 0.0
+                    warnings:
+                    - timezone_is_user_selected_assumption
+                    - evidence_score_is_not_probability
+        '400':
+          description: Malformed JSON, including nonstandard NaN/Infinity numeric tokens
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
+              example:
+                error: {code: malformed_payload, message: Invalid JSON, details: []}
+        '401':
+          description: Authentication required or token invalid
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
+        '403':
+          description: Authenticated caller cannot access this user_id
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
+        '413':
+          description: Body exceeds 20 MiB decoded; array above 100000 points
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
+        '415':
+          description: Content type must be application/json
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
+        '422':
+          description: |
+            Invalid coordinates, non-UTC/invalid timestamps, unknown properties, unsupported
+            model/configuration or unknown IANA timezone. Reject the whole request before
+            processing; unlike the forgiving offline PLT loader, do not silently drop invalid input.
+            Window constraints: night_start_hour > night_end_hour; work_start_hour < work_end_hour.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
+              example:
+                error:
+                  code: validation_error
+                  message: Request validation failed
+                  details:
+                    - {path: /points/0/latitude, issue: Must be between -90 and 90}
+        '429':
+          description: Per-caller resource/rate limit exceeded
+          headers:
+            Retry-After:
+              schema: {type: integer, minimum: 1}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
+        '500':
+          description: Internal error; response contains no stack traces or GPS values
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
+        '503':
+          description: Processing deadline or stay-event resource limit exceeded; no partial result
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Proposed bearer authentication; caller authorization must constrain user_id
+  schemas:
+    UTCDateTime:
+      type: string
+      format: date-time
+      pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?(Z|\+00:00)$'
+      description: RFC3339 timestamp with explicit UTC Z or +00:00; no naive/local timestamps
+    Score:
+      type: number
+      minimum: 0
+      maximum: 1
+    Latitude: {type: number, minimum: -90, maximum: 90}
+    Longitude: {type: number, minimum: -180, maximum: 180}
+    Nonnegative: {type: number, minimum: 0}
+    Count: {type: integer, minimum: 0}
+    ModelVersion: {type: string, enum: [heuristic-v1, dbscan-v1], default: dbscan-v1}
+    Config:
+      type: object
+      additionalProperties: false
+      description: |
+        All fields optional in requests; responses include the resolved full configuration.
+        Defaults are hypotheses. Distance and duration must be finite and positive.
+        Timezone must be a recognized IANA zone; syntax alone cannot ensure recognition.
+        Service boundary must validate cross-field window constraints before execution.
+      properties:
+        timezone: {type: string, minLength: 1, maxLength: 100, default: Asia/Shanghai}
+        distance_m: {type: number, exclusiveMinimum: 0, default: 100}
+        min_stay_minutes: {type: number, exclusiveMinimum: 0, default: 10}
+        max_gap_minutes: {type: number, exclusiveMinimum: 0, default: 5}
+        eps_m: {type: number, exclusiveMinimum: 0, default: 100}
+        min_samples: {type: integer, minimum: 1, default: 3}
+        speed_warning_mps: {type: number, exclusiveMinimum: 0, default: 100}
+        night_start_hour: {type: integer, minimum: 0, maximum: 23, default: 22}
+        night_end_hour: {type: integer, minimum: 0, maximum: 23, default: 6}
+        work_start_hour: {type: integer, minimum: 0, maximum: 23, default: 9}
+        work_end_hour: {type: integer, minimum: 0, maximum: 23, default: 18}
+        min_role_days: {type: integer, minimum: 1, default: 3}
+        min_office_weeks: {type: integer, minimum: 1, default: 2}
+        min_role_dwell_minutes: {type: number, exclusiveMinimum: 0, default: 60}
+        min_evidence_score: {$ref: '#/components/schemas/Score', default: 0.5}
+        min_candidate_share: {$ref: '#/components/schemas/Score', default: 0.5}
+        min_poi_days: {type: integer, minimum: 1, default: 3}
+        max_pois: {type: integer, minimum: 1, default: 10}
+    Point:
+      type: object
+      additionalProperties: false
+      required: [trajectory_id, latitude, longitude, timestamp]
+      properties:
+        trajectory_id: {type: string, minLength: 1, maxLength: 128}
+        latitude: {$ref: '#/components/schemas/Latitude'}
+        longitude: {$ref: '#/components/schemas/Longitude'}
+        timestamp: {$ref: '#/components/schemas/UTCDateTime'}
+        altitude_m:
+          type: [number, 'null']
+          description: Optional altitude in meters; null means missing; not used for role inference
+    InferenceRequest:
+      type: object
+      additionalProperties: false
+      required: [user_id, points]
+      properties:
+        user_id: {type: string, minLength: 1, maxLength: 64, pattern: '.*\S.*'}
+        model_version: {$ref: '#/components/schemas/ModelVersion'}
+        config: {$ref: '#/components/schemas/Config'}
+        points:
+          type: array
+          minItems: 0
+          maxItems: 100000
+          items: {$ref: '#/components/schemas/Point'}
+    EvidenceComponents:
+      type: object
+      additionalProperties: false
+      required: [recurrence, duration, temporal_consistency, coverage, relative_strength]
+      description: |
+        Score = .30*recurrence + .25*duration + .20*temporal_consistency + .15*coverage + .10*relative_strength.
+        recurrence=min(role_days/5,1); duration=min(role_dwell_minutes/600,1);
+        temporal_consistency=role_days/max(1,user observed days in role window);
+        coverage=min(user observed_minutes/1440,1); relative_strength=cluster role dwell/all clustered role dwell.
+        Noise is excluded from the relative-strength denominator. Scores are not calibrated probabilities.
+      properties:
+        recurrence: {$ref: '#/components/schemas/Score'}
+        duration: {$ref: '#/components/schemas/Score'}
+        temporal_consistency: {$ref: '#/components/schemas/Score'}
+        coverage: {$ref: '#/components/schemas/Score'}
+        relative_strength: {$ref: '#/components/schemas/Score'}
+    Candidate:
+      type: object
+      additionalProperties: false
+      required: [cluster_id, latitude, longitude, evidence_score, evidence_components, role_dwell_minutes, role_visit_days, relative_share, eligible]
+      properties:
+        cluster_id: {type: integer, minimum: 0, description: Local to this user and model run; not stable across configurations}
+        latitude: {$ref: '#/components/schemas/Latitude'}
+        longitude: {$ref: '#/components/schemas/Longitude'}
+        evidence_score: {$ref: '#/components/schemas/Score'}
+        evidence_components: {$ref: '#/components/schemas/EvidenceComponents'}
+        role_dwell_minutes: {$ref: '#/components/schemas/Nonnegative'}
+        role_visit_days: {$ref: '#/components/schemas/Count'}
+        relative_share: {$ref: '#/components/schemas/Score'}
+        eligible: {type: boolean, description: Meets role-specific minimum days/dwell and office weeks; not alone sufficient to predict}
+    RolePrediction:
+      type: object
+      additionalProperties: false
+      required: [status, reason, candidate, alternatives]
+      properties:
+        status: {type: string, enum: [predicted, unknown]}
+        reason:
+          type: string
+          enum: [sufficient_heuristic_evidence, insufficient_evidence, low_evidence_score, ambiguous_candidates]
+        candidate:
+          anyOf:
+            - {$ref: '#/components/schemas/Candidate'}
+            - {type: 'null'}
+        alternatives:
+          type: array
+          maxItems: 3
+          items: {$ref: '#/components/schemas/Candidate'}
+      allOf:
+        - if:
+            properties: {status: {const: unknown}}
+          then:
+            properties:
+              candidate: {type: 'null'}
+              reason: {enum: [insufficient_evidence, low_evidence_score, ambiguous_candidates]}
+          else:
+            properties:
+              candidate: {$ref: '#/components/schemas/Candidate'}
+              reason: {const: sufficient_heuristic_evidence}
+    Location:
+      type: object
+      additionalProperties: false
+      required: [user_id, cluster_id, latitude, longitude, stay_event_count, visit_count, unique_visit_days, distinct_weeks, total_dwell_minutes, night_dwell_minutes, weekday_dwell_minutes, weekday_daytime_dwell_minutes, weekend_dwell_minutes, night_visit_days, weekday_daytime_visit_days, weekday_daytime_weeks, mean_visit_duration, radius_max_m, radius_p95_m, observation_coverage]
+      properties:
+        user_id: {type: string}
+        cluster_id: {type: integer, minimum: 0}
+        latitude: {$ref: '#/components/schemas/Latitude'}
+        longitude: {$ref: '#/components/schemas/Longitude'}
+        stay_event_count: {$ref: '#/components/schemas/Count'}
+        visit_count: {$ref: '#/components/schemas/Count', description: Count of disjoint observed stay intervals; gaps never filled}
+        unique_visit_days: {$ref: '#/components/schemas/Count'}
+        distinct_weeks: {$ref: '#/components/schemas/Count', description: Distinct local ISO year-week pairs}
+        total_dwell_minutes: {$ref: '#/components/schemas/Nonnegative'}
+        night_dwell_minutes: {$ref: '#/components/schemas/Nonnegative'}
+        weekday_dwell_minutes: {$ref: '#/components/schemas/Nonnegative'}
+        weekday_daytime_dwell_minutes: {$ref: '#/components/schemas/Nonnegative'}
+        weekend_dwell_minutes: {$ref: '#/components/schemas/Nonnegative'}
+        night_visit_days: {$ref: '#/components/schemas/Count', description: Distinct local calendar dates with positive night overlap}
+        weekday_daytime_visit_days: {$ref: '#/components/schemas/Count'}
+        weekday_daytime_weeks: {$ref: '#/components/schemas/Count'}
+        mean_visit_duration: {$ref: '#/components/schemas/Nonnegative', description: Total dwell minutes / visit_count}
+        radius_max_m: {$ref: '#/components/schemas/Nonnegative', description: Maximum stay-center distance from representative cluster center}
+        radius_p95_m: {$ref: '#/components/schemas/Nonnegative'}
+        observation_coverage: {$ref: '#/components/schemas/Score', description: Cluster visited dates / all user observed dates; not fraction of real-life time captured}
+    Coverage:
+      type: object
+      additionalProperties: false
+      required: [observed_minutes, observed_days, calendar_span_days, observed_day_fraction, observed_time_fraction, night_observed_days, work_observed_days, first_timestamp, last_timestamp]
+      properties:
+        observed_minutes: {$ref: '#/components/schemas/Nonnegative', description: Union of within-trajectory adjacent-point intervals within max_gap; not stationary time}
+        observed_days: {$ref: '#/components/schemas/Count'}
+        calendar_span_days: {$ref: '#/components/schemas/Count'}
+        observed_day_fraction: {$ref: '#/components/schemas/Score'}
+        observed_time_fraction: {$ref: '#/components/schemas/Score'}
+        night_observed_days: {$ref: '#/components/schemas/Count'}
+        work_observed_days: {$ref: '#/components/schemas/Count'}
+        first_timestamp:
+          anyOf:
+            - {$ref: '#/components/schemas/UTCDateTime'}
+            - {type: 'null'}
+        last_timestamp:
+          anyOf:
+            - {$ref: '#/components/schemas/UTCDateTime'}
+            - {type: 'null'}
+    Diagnostics:
+      type: object
+      additionalProperties: false
+      required: [input_points, invalid_coordinates, invalid_timestamps, invalid_rows_removed, invalid_altitudes, duplicate_records_removed, conflicting_timestamps_removed, gaps_over_limit, high_speed_segments, output_points, overlapping_stays_removed, stay_events, location_clusters, noise_stays, noise_proportion]
+      properties:
+        input_points: {$ref: '#/components/schemas/Count'}
+        invalid_coordinates: {$ref: '#/components/schemas/Count'}
+        invalid_timestamps: {$ref: '#/components/schemas/Count'}
+        invalid_rows_removed: {$ref: '#/components/schemas/Count'}
+        invalid_altitudes: {$ref: '#/components/schemas/Count'}
+        duplicate_records_removed: {$ref: '#/components/schemas/Count'}
+        conflicting_timestamps_removed: {$ref: '#/components/schemas/Count'}
+        gaps_over_limit: {$ref: '#/components/schemas/Count'}
+        high_speed_segments: {$ref: '#/components/schemas/Count'}
+        output_points: {$ref: '#/components/schemas/Count'}
+        overlapping_stays_removed: {$ref: '#/components/schemas/Count'}
+        stay_events: {$ref: '#/components/schemas/Count'}
+        location_clusters: {$ref: '#/components/schemas/Count'}
+        noise_stays: {$ref: '#/components/schemas/Count'}
+        noise_proportion: {$ref: '#/components/schemas/Score'}
+    InferenceResponse:
+      type: object
+      additionalProperties: false
+      required: [inference_id, user_id, model_version, pipeline_version, status, timezone, config, score_semantics, home, office, pois, locations, coverage, diagnostics, warnings]
+      properties:
+        inference_id: {type: string, format: uuid, description: Deterministic UUID for normalized input/model/config; not an authentication token}
+        user_id: {type: string}
+        model_version: {$ref: '#/components/schemas/ModelVersion'}
+        pipeline_version: {type: string, const: 0.1.0}
+        status: {type: string, const: completed}
+        timezone: {type: string}
+        config:
+          allOf:
+            - {$ref: '#/components/schemas/Config'}
+            - required: [timezone, distance_m, min_stay_minutes, max_gap_minutes, eps_m, min_samples, speed_warning_mps, night_start_hour, night_end_hour, work_start_hour, work_end_hour, min_role_days, min_office_weeks, min_role_dwell_minutes, min_evidence_score, min_candidate_share, min_poi_days, max_pois]
+        score_semantics: {type: string}
+        home: {$ref: '#/components/schemas/RolePrediction'}
+        office: {$ref: '#/components/schemas/RolePrediction'}
+        pois:
+          type: array
+          description: Recurring locations excluding selected Home/Office; length bounded by resolved config.max_pois
+          items: {$ref: '#/components/schemas/Location'}
+        locations:
+          type: array
+          description: All non-noise clusters; cluster IDs are local to user/model/config
+          items: {$ref: '#/components/schemas/Location'}
+        coverage: {$ref: '#/components/schemas/Coverage'}
+        diagnostics: {$ref: '#/components/schemas/Diagnostics'}
+        warnings:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum: [timezone_is_user_selected_assumption, evidence_score_is_not_probability, sparse_observation_days, high_speed_segments_retained, extended_location_clusters, overlapping_trajectory_stays_removed]
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message, details]
+          properties:
+            code:
+              type: string
+              enum: [malformed_payload, validation_error, unauthenticated, forbidden, payload_too_large, unsupported_media_type, rate_limited, internal_error, resource_exhausted]
+            message: {type: string, maxLength: 500}
+            details:
+              type: array
+              maxItems: 100
+              items:
+                type: object
+                additionalProperties: false
+                required: [path, issue]
+                properties:
+                  path: {type: string, description: JSON Pointer to invalid field; never include GPS values}
+                  issue: {type: string, maxLength: 200}

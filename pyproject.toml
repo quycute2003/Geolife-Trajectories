@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "geolife-inference"
+version = "0.1.0"
+description = "Offline GeoLife Home/Office/recurring-location baseline; CP1"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "numpy==2.4.4", "pandas==2.2.3", "scikit-learn==1.7.1", "tzdata==2025.1",
+]
+
+[dependency-groups]
+dev = ["pytest==9.0.3", "PyYAML==6.0.3", "openapi-spec-validator>=0.7.2,<0.9", "matplotlib>=3.9,<3.11"]
+notebook = ["ipykernel>=6.30,<8", "nbclient>=0.10,<0.11", "nbformat>=5.10,<6", "jupyterlab>=4.4,<5"]
+
+[project.scripts]
+geolife = "geolife_inference.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

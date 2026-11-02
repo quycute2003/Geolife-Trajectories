@@ -1,0 +1,19 @@
+# Initial hypotheses, not optimized thresholds. UTC input; local behavioral windows.
+timezone = "Asia/Shanghai"
+distance_m = 100.0
+min_stay_minutes = 10.0
+max_gap_minutes = 5.0
+eps_m = 100.0
+min_samples = 3
+speed_warning_mps = 100.0
+night_start_hour = 22
+night_end_hour = 6
+work_start_hour = 9
+work_end_hour = 18
+min_role_days = 3
+min_office_weeks = 2
+min_role_dwell_minutes = 60.0
+min_evidence_score = 0.5
+min_candidate_share = 0.5
+min_poi_days = 3
+max_pois = 10
