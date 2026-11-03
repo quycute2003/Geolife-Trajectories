@@ -12,6 +12,7 @@ class Config:
     distance_m: float = 100.0
     min_stay_minutes: float = 10.0
     max_gap_minutes: float = 5.0
+    conflict_merge_threshold_m: float = 20.0
     eps_m: float = 100.0
     min_samples: int = 3
     speed_warning_mps: float = 100.0
@@ -37,6 +38,10 @@ class Config:
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
                 raise ValueError(f"{name} must be positive and finite")
+        threshold = self.conflict_merge_threshold_m
+        if (isinstance(threshold, bool) or not isinstance(threshold, (int, float))
+                or not math.isfinite(threshold) or threshold < 0):
+            raise ValueError("conflict_merge_threshold_m must be nonnegative and finite")
         for name in ("min_samples", "min_role_days", "min_office_weeks", "min_poi_days", "max_pois"):
             if type(getattr(self, name)) is not int or getattr(self, name) < 1:
                 raise ValueError(f"{name} must be a positive integer")

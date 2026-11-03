@@ -5,9 +5,40 @@ from typing import Iterator, TextIO
 import io
 import zipfile
 
+import numpy as np
 import pandas as pd
 
 POINT_COLUMNS = ["user_id", "trajectory_id", "latitude", "longitude", "altitude_m", "timestamp"]
+
+
+def iter_cleaned_timelines(path: str | Path, chunksize: int = 100_000) -> Iterator[pd.DataFrame]:
+    """Read every cleaned trajectory's timeline, retaining CSV chunk boundaries.
+
+    Only columns needed for observation coverage are read. Input must keep each
+    (user, trajectory) contiguous, as produced by NB02; coverage validates this.
+    """
+    if type(chunksize) is not int or chunksize < 1:
+        raise ValueError("chunksize must be a positive integer")
+    columns = ["user_id", "trajectory_id", "timestamp", "observation_segment"]
+    carry = None
+    with pd.read_csv(path, usecols=columns, dtype={"user_id": "string", "trajectory_id": "string",
+                                                "observation_segment": "int64"}, chunksize=chunksize) as reader:
+        for chunk in reader:
+            if chunk.empty:
+                continue
+            chunk["timestamp"] = pd.to_datetime(chunk["timestamp"], utc=True, errors="raise")
+            if chunk.isna().any().any():
+                raise ValueError("Cleaned timeline contains missing values")
+            if carry is not None:
+                chunk = pd.concat([carry, chunk], ignore_index=True)
+            changed = (chunk["user_id"].ne(chunk["user_id"].shift()).fillna(True)
+                       | chunk["trajectory_id"].ne(chunk["trajectory_id"].shift()).fillna(True))
+            starts = np.flatnonzero(changed.to_numpy(dtype=bool))
+            for start, end in zip(starts[:-1], starts[1:]):
+                yield chunk.iloc[start:end].copy()
+            carry = chunk.iloc[starts[-1]:].copy()
+    if carry is not None and not carry.empty:
+        yield carry
 
 
 def parse_plt(stream: TextIO, user_id: str, trajectory_id: str) -> pd.DataFrame:

@@ -2,7 +2,7 @@ import pandas as pd
 import pytest
 from geolife_inference.config import Config
 from geolife_inference.preprocessing import preprocess
-from geolife_inference.stays import detect_stays
+from geolife_inference.stays import detect_stays, split_overlapping_stays
 
 
 def detect(frame):
@@ -52,3 +52,44 @@ def test_overlapping_files_not_double_counted(make_points):
     clean, _ = preprocess(frame, Config())
     stays, audit = detect_stays(clean, Config())
     assert len(stays) == 1 and audit["overlapping_stays_removed"] == 1
+
+
+def test_unresolved_conflict_breaks_short_gap_at_same_location(make_points):
+    frame = make_points([0, 5, 10, 11, 16, 21])
+    frame["observation_segment"] = [1, 1, 1, 2, 2, 2]
+    stays = detect(frame)
+    assert stays.duration_minutes.tolist() == [10, 10]
+    assert stays.observation_segment.tolist() == [1, 2]
+    assert stays.point_count.tolist() == [3, 3]
+
+
+def test_short_segments_cannot_pool_duration(make_points):
+    frame = make_points([0, 5, 6, 11])
+    frame["observation_segment"] = [1, 1, 2, 2]
+    assert detect(frame).empty
+
+
+def test_departure_is_not_stay_end(make_points):
+    frame = make_points([0, 5, 10, 11])
+    frame.loc[3, "latitude"] += .02
+    stays = detect(frame)
+    assert stays.duration_minutes.tolist() == [10]
+    assert stays.end_time.iloc[0] == frame.timestamp.iloc[2]
+
+
+def test_stay_representative_across_date_line(make_points):
+    frame = make_points([0, 5, 10], latitude=0)
+    frame["longitude"] = [179.9999, -179.9999, 179.9998]
+    stays = detect(frame)
+    assert len(stays) == 1
+    assert abs(stays.longitude.iloc[0]) > 179.99
+
+
+def test_overlap_review_keeps_rejected_events_and_touching_boundary(make_points):
+    frames = [make_points([0, 5, 10], trajectory="a"),
+              make_points([1, 6, 11], trajectory="b"),
+              make_points([10, 15, 20], trajectory="c")]
+    events = pd.concat([detect(f) for f in frames], ignore_index=True)
+    accepted, rejected = split_overlapping_stays(events)
+    assert accepted.trajectory_id.tolist() == ["a", "c"]
+    assert rejected.trajectory_id.tolist() == ["b"]

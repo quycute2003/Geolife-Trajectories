@@ -29,7 +29,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dataset", type=Path, required=True)
     parser.add_argument("--output", type=Path, default=Path("artifacts/evaluation"))
-    parser.add_argument("--users", nargs="+", default=["000", "001", "002"])
+    parser.add_argument("--users", nargs="+", help="Optional explicit users; default: all users")
     parser.add_argument("--scan-inventory", action="store_true")
     args = parser.parse_args()
     source = GeoLifeSource(args.dataset)
@@ -56,9 +56,9 @@ def main() -> None:
             inventory["total_record_lines"] = sum(counts.values())
             inventory["label_file_count"] = sum(n.endswith("labels.txt") for n in z.namelist())
     write_json(args.output / "inventory.json", inventory)
-    # Add one real sparse user, chosen by lowest trajectory count then user ID.
-    sparse = min(source.by_user, key=lambda u: (len(source.by_user[u]), u))
-    users = list(dict.fromkeys([*args.users, sparse]))
+    users = args.users if args.users is not None else sorted(source.by_user)
+    if len(set(users)) != len(users) or not set(users) <= set(source.by_user):
+        parser.error("Supply distinct existing user IDs")
     base = Config()
     experiments = [("baseline", "dbscan-v1", base), ("baseline", "heuristic-v1", base),
                    ("distance-50m", "dbscan-v1", replace(base, distance_m=50)),

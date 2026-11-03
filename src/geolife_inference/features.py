@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 
 from .config import Config
+from .data import iter_cleaned_timelines
 from .geo import haversine_m, representative
 
 Interval = tuple[datetime, datetime]
@@ -64,29 +65,89 @@ def temporal_summary(intervals: Iterable[Interval], config: Config) -> dict:
             "mean_visit_duration": totals["total_dwell_minutes"] / len(intervals) if intervals else 0.0}
 
 
-def observation_coverage(points: pd.DataFrame, config: Config) -> dict:
-    intervals = []
-    for _, frame in points.groupby(["user_id", "trajectory_id"], sort=False):
-        times = frame.sort_values("timestamp").timestamp.tolist()
-        intervals.extend((s, e) for s, e in zip(times, times[1:])
-                         if 0 < (e - s).total_seconds() <= config.max_gap_minutes * 60)
+def _observation_runs(frame: pd.DataFrame, config: Config) -> list[Interval]:
+    """Compress adjacent valid pairs without filling gaps or segment breaks."""
+    frame = frame.sort_values("timestamp", kind="stable")
+    if frame.empty:
+        return []
+    times = frame.timestamp.reset_index(drop=True)
+    gap = times.diff().dt.total_seconds()
+    breaks = gap.isna() | gap.le(0) | gap.gt(config.max_gap_minutes * 60)
+    if "observation_segment" in frame:
+        segments = frame.observation_segment.reset_index(drop=True)
+        breaks |= segments.ne(segments.shift())
+    starts = np.flatnonzero(breaks.to_numpy())
+    ends = np.r_[starts[1:] - 1, len(times) - 1]
+    return [(times.iloc[start], times.iloc[end]) for start, end in zip(starts, ends) if end > start]
+
+
+def _coverage_summary(intervals: Iterable[Interval], days: set, first, last, config: Config) -> dict:
     summary = temporal_summary(intervals, config)
-    if points.empty:
+    if first is None:
         return {"observed_minutes": 0.0, "observed_days": 0, "calendar_span_days": 0,
                 "observed_day_fraction": 0.0, "observed_time_fraction": 0.0,
                 "night_observed_days": 0, "work_observed_days": 0,
                 "first_timestamp": None, "last_timestamp": None}
-    times = points.timestamp
-    zone = ZoneInfo(config.timezone)
-    days = set(times.dt.tz_convert(zone).dt.date)
     span = (max(days) - min(days)).days + 1
-    span_minutes = (times.max() - times.min()).total_seconds() / 60
+    span_minutes = (last - first).total_seconds() / 60
     return {"observed_minutes": summary["total_dwell_minutes"], "observed_days": len(days),
             "calendar_span_days": span, "observed_day_fraction": len(days) / span,
             "observed_time_fraction": summary["total_dwell_minutes"] / span_minutes if span_minutes else 0.0,
             "night_observed_days": summary["night_visit_days"],
             "work_observed_days": summary["weekday_daytime_visit_days"],
-            "first_timestamp": times.min().isoformat(), "last_timestamp": times.max().isoformat()}
+            "first_timestamp": first.isoformat(), "last_timestamp": last.isoformat()}
+
+
+def observation_coverage(points: pd.DataFrame, config: Config) -> dict:
+    intervals = []
+    for _, frame in points.groupby(["user_id", "trajectory_id"], sort=False):
+        intervals.extend(_observation_runs(frame, config))
+    times = points.timestamp
+    days = set(times.dt.tz_convert(config.timezone).dt.date) if len(times) else set()
+    return _coverage_summary(intervals, days, times.min() if len(times) else None,
+                             times.max() if len(times) else None, config)
+
+
+def stream_observation_coverage(path, config: Config, chunksize: int = 100_000) -> Iterable[dict]:
+    """Yield exact per-user coverage over all cleaned GPS, not only stay points.
+
+    Memory holds one trajectory plus compressed observed intervals for one user.
+    Union across overlapping files avoids double-counting; chunk boundaries do not
+    cut intervals, while NB02 observation_segment boundaries always do.
+    """
+    user, intervals, days, first, last = None, [], set(), None, None
+    trajectories, finished_users, count = set(), set(), 0
+
+    def finish():
+        return {"user_id": user, "processed_points": count, "processed_trajectories": len(trajectories),
+                **_coverage_summary(intervals, days, first, last, config)}
+
+    for frame in iter_cleaned_timelines(path, chunksize):
+        current = str(frame.user_id.iloc[0])
+        if current != user:
+            if current in finished_users:
+                raise ValueError(f"User is not contiguous in cleaned CSV: {current}")
+            if user is not None:
+                yield finish()
+                finished_users.add(user)
+            user, intervals, days, first, last = current, [], set(), None, None
+            trajectories, count = set(), 0
+        trajectory = str(frame.trajectory_id.iloc[0])
+        if trajectory in trajectories:
+            raise ValueError(f"Trajectory is not contiguous: {current}/{trajectory}")
+        if not frame.timestamp.is_monotonic_increasing or frame.timestamp.duplicated().any():
+            raise ValueError("Cleaned trajectory timestamps must strictly increase")
+        if not frame.observation_segment.is_monotonic_increasing:
+            raise ValueError("Cleaned observation segments must be increasing")
+        trajectories.add(trajectory)
+        count += len(frame)
+        intervals.extend(_observation_runs(frame, config))
+        days.update(frame.timestamp.dt.tz_convert(config.timezone).dt.date)
+        earliest, latest = frame.timestamp.min(), frame.timestamp.max()
+        first = earliest if first is None else min(first, earliest)
+        last = latest if last is None else max(last, latest)
+    if user is not None:
+        yield finish()
 
 
 def cluster_features(stays: pd.DataFrame, coverage: dict, config: Config) -> list[dict]:

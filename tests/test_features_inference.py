@@ -6,7 +6,8 @@ import pytest
 
 from geolife_inference.clustering import group_locations
 from geolife_inference.config import Config
-from geolife_inference.features import temporal_summary, union_intervals
+from geolife_inference.features import observation_coverage, stream_observation_coverage, temporal_summary, union_intervals
+from geolife_inference.inference import EVIDENCE_WEIGHTS, rank_role, role_candidates
 from geolife_inference.pipeline import run_pipeline
 
 
@@ -150,3 +151,59 @@ def test_many_samples_and_visits_on_one_day_are_not_recurring_place(make_points)
     assert result["locations"][0]["unique_visit_days"] == 1
     assert result["home"]["status"] == result["office"]["status"] == "unknown"
     assert result["pois"] == []
+
+
+@pytest.mark.parametrize("chunksize", [1, 2, 3, 100])
+def test_stream_coverage_preserves_chunks_segments_and_file_union(make_points, tmp_path, chunksize):
+    a = make_points([0, 5, 6, 11], trajectory="a")
+    a["observation_segment"] = [1, 1, 2, 2]
+    # Overlap 0..5 with a; do not bridge the conflict break at 5..6.
+    b = make_points([0, 5], trajectory="b")
+    b["observation_segment"] = 1
+    c = make_points([0, 5, 100, 105], user="001", trajectory="c")
+    c["observation_segment"] = [1, 1, 2, 2]
+    points = pd.concat([a, b, c], ignore_index=True)
+    path = tmp_path / "cleaned.csv.gz"
+    points.to_csv(path, index=False)
+    rows = list(stream_observation_coverage(path, Config(), chunksize))
+    assert [r["user_id"] for r in rows] == ["000", "001"]
+    for row in rows:
+        frame = points.loc[points.user_id.eq(row["user_id"])]
+        expected = observation_coverage(frame, Config())
+        assert {k: row[k] for k in expected} == expected
+        assert row["observed_minutes"] == 10
+        assert row["processed_points"] == len(frame)
+    assert rows[0]["processed_trajectories"] == 2
+
+
+def test_coverage_midnight_end_is_not_a_second_observed_night(make_points, tmp_path):
+    points = make_points([0, 5], start=stamp("2024-01-05T15:55:00Z"))
+    points["observation_segment"] = 1
+    path = tmp_path / "cleaned.csv"
+    points.to_csv(path, index=False)
+    row = next(iter(stream_observation_coverage(path, Config(), 1)))
+    assert row["observed_days"] == 2  # GPS fix exactly at midnight on next date.
+    assert row["night_observed_days"] == 1  # Positive interval only on first date.
+    assert row["observed_minutes"] == 5
+
+
+def test_stream_coverage_rejects_reappearing_user(make_points, tmp_path):
+    frames = [make_points([0, 5], user=u, trajectory=t) for u, t in [("000", "a"), ("001", "b"), ("000", "c")]]
+    points = pd.concat(frames, ignore_index=True)
+    points["observation_segment"] = 1
+    path = tmp_path / "bad.csv"
+    points.to_csv(path, index=False)
+    with pytest.raises(ValueError, match="User is not contiguous"):
+        list(stream_observation_coverage(path, Config(), 2))
+
+
+def test_role_candidate_components_match_decision_and_office_weeks(make_points):
+    run = run_pipeline(recurring_points(make_points), "000")
+    candidates = role_candidates(run.result["locations"], run.result["coverage"], Config(), "home")
+    best = candidates[0]
+    assert best == rank_role(run.result["locations"], run.result["coverage"], Config(), "home")["candidate"]
+    assert best["evidence_score"] == pytest.approx(sum(best["evidence_components"][k] * w for k, w in EVIDENCE_WEIGHTS.items()))
+    # Holding dwell/days constant, insufficient distinct work weeks must abstain.
+    locations = [{**loc, "weekday_daytime_weeks": 1} for loc in run.result["locations"]]
+    decision = rank_role(locations, run.result["coverage"], Config(), "office")
+    assert decision["status"] == "unknown" and decision["reason"] == "insufficient_evidence"

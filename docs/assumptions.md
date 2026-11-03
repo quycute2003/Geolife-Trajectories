@@ -7,9 +7,9 @@
   Không tự xác định timezone bằng GPS. Với travel ngoài zone, phải chạy lại với lựa chọn thích hợp.
 - Altitude feet → meters bằng 0.3048; -777 → missing. Altitude không tham gia inference.
 - Invalid rows bị loại, exact duplicates theo user/trajectory/time/lat/lon bị loại.
-  Altitude không thuộc duplicate key. Equal timestamps khác tọa độ giữ lat/lon nhỏ nhất
-  theo thứ tự từ điển, ghi audit. Đây là quyết định deterministic, không khẳng định điểm giữ lại đúng.
-- Khoảng thời gian giữa hai điểm hợp lệ liên tiếp <= max gap được coi là observed interval.
+  Altitude không thuộc duplicate key. Core 0.2.0 dùng spatial/context voting như NB02,
+  không còn chọn lat/lon nhỏ nhất; threshold mặc định 20 m, có config.
+- Khoảng thời gian giữa hai điểm hợp lệ liên tiếp cùng trajectory/observation_segment <= max gap được coi là observed interval.
   Invalid rows bị loại có thể để lại interval ngắn đủ điều kiện; không chứng minh quan sát liên tục.
 - Tốc độ >100 m/s được cảnh báo, **không xóa**, vì có nhiều phương tiện và sampling artifacts.
 
@@ -83,12 +83,37 @@ Không báo Accuracy/Precision/Recall/F1; score chỉ mô tả bằng chứng d�
 Theo yêu cầu ngày 2026-11-02, NB02 không dùng lexicographic tie-break cho timestamp conflicts nữa.
 Notebook scan mọi conflict group trên toàn dataset và tính maximum pairwise Haversine separation.
 Sau khi người dùng chọn ngưỡng từ phân phối, nhóm trong ngưỡng gộp mean lat/lon (longitude unwrap qua ±180°),
-nhóm vượt ngưỡng được cách ly khỏi cleaned output và lưu toàn bộ distinct input fixes để review.
-Các nhóm cách ly làm ngắt observation segment để tránh coi khoảng giữa hai đầu là stationary evidence.
+nhóm vượt ngưỡng chọn tập đông nhất mà mọi pair nằm trong ngưỡng. Nếu hòa, dùng các timestamps
+không-conflict trong cùng trajectory ±max_gap_minutes; mỗi context fix bỏ phiếu cho duy nhất cụm gần nhất
+nằm trong ngưỡng. Nếu vẫn hòa/không có phiếu thì giữ riêng toàn timestamp và ngắt observation segment.
+Điểm ngoài cụm thắng cũng được giữ riêng để review, nhưng không ngắt segment khi timestamp đã có winner.
 Exact duplicate positions chỉ góp một trọng số; altitude mean bỏ missing, all-missing giữ NaN.
-Ngưỡng mặc định None, chưa có kết quả full-data scan/cleaning được khẳng định trong lần sửa này.
+NB02 mặc định ngưỡng chưa chọn (None) ở bản đầu; người dùng đã chọn 20 m và chạy toàn dataset.
+Core/CLI 0.2.0 mặc định 20 m trong `conflict_merge_threshold_m`, có thể cấu hình lại sau khi review.
 
 Counts tách invalid/exact duplicate removals, rows absorbed into means và unresolved rows.
 Mỗi điểm gộp có source_point_count, ID đại diện và provenance; mean không có nghĩa là tọa độ ground truth.
 Core preprocessing được gọi sau khi notebook đã xử lý conflicts và phải không còn drop conflict nào.
-Core/CLI đọc raw vẫn dùng policy baseline cũ được mô tả ở trên; chỉ đồng bộ sau khi policy/ngưỡng được chốt.
+Core/CLI 0.2.0 đã đồng bộ policy này. Invalid/exact duplicates ở removed_points; mọi distinct conflict fix
+ở conflict_points, có group ID/spread/decision/output ID. `conflicting_timestamps_removed` chỉ còn là alias
+legacy của merged_extra_points + unresolved_conflict_rows, không dùng nó để gọi mean contributors là deleted.
+
+## NB05 — coverage và suy luận từ kết quả notebook
+
+NB05 dùng assignments/clusters NB04 đã được tạo từ preprocessing voting và các observation segments.
+Coverage phải đọc mọi cleaned GPS points, gồm khi di chuyển/người không có stay; không lấy stay days
+làm observed days. Chỉ ghép adjacent pairs cùng trajectory/segment với 0 < gap <= max gap.
+Các pairs nối tiếp được nén thành interval runs trước khi union across files, giữ nguyên elapsed time
+và các boundary theo khung giờ; không nội suy qua unresolved conflicts. Core observation_coverage
+đã đồng bộ việc ngắt theo observation_segment. Đường CLI/raw 0.2.0 dùng cùng voting policy với notebook.
+
+Cache coverage khóa theo input fingerprints, timezone/max gap/night/work windows và policy version;
+audit kiểm tra số points/trajectories ở từng user khớp NB02. Đổi ngưỡng quyết định không đổi coverage.
+Điểm và quyết định Home/Office vẫn dùng cùng baseline weights/rules ở trên; `role_candidates` chỉ
+trả thêm toàn bộ bảng ứng viên cho notebook xem, không thay tie-break hoặc abstention.
+`share_including_noise` là diagnostic trên role dwell trong tất cả stays, không tự thay relative_share.
+User không có cluster vẫn có hàng unknown; POIs có thể chứa ứng viên Home/Office chưa được chọn.
+Map chỉ đặt H/O/H+O/P ở cluster đã được chọn, không đặt marker cho unknown.
+NB05 đã được người dùng chạy toàn dataset (37 Home / 18 Office cho DBSCAN), nhưng chưa có nhãn thật
+để đo accuracy. Core/CLI 0.2.0 đã được kiểm tra parity synthetic cả hai models; lượt CLI DBSCAN full-data
+do người dùng chạy đã khớp các saved outputs NB02–05 trong float tolerance. CLI heuristic mới chưa chạy lại.

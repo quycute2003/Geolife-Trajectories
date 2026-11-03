@@ -1,20 +1,19 @@
 openapi: 3.1.0
 info:
   title: Home / Office / Recurring Location Inference
-  version: 0.1.0-draft
+  version: 0.2.0-draft
   description: |
-    CP1 contract for mentor review. No HTTP implementation exists.
+    CP1 API design proposal for direct presentation. No HTTP implementation exists.
     Synchronous inference for one user's GPS history; POI means recurring location,
     not a business category. Scores are uncalibrated heuristic evidence, not probabilities.
     Unknown roles are successful completed inferences (200), including empty inputs.
     Proposed limits: 100000 points, 20 MiB decoded JSON body, 20000 stay events,
-    60-second processing deadline; these service limits require mentor review and load tests.
+    60-second processing deadline; these are proposed service limits and require load tests before implementation.
     UTC input is required. Behavioral timezone is explicit and never inferred from coordinates.
     No dataset paths, URLs, cross-user requests or server-side file access are accepted.
     Production must use HTTPS, authentication, authorization for user_id, request size limits,
     no coordinate logging, no shared response caching, and no persistence by default.
     Deployment and enforcement belong to later approved API work.
-x-mentor-approval: pending
 tags:
   - name: locations
 security:
@@ -28,8 +27,11 @@ paths:
       description: |
         Proposal only. Point ordering is normalized per trajectory. Each trajectory_id
         identifies a recording boundary; it must not be reused for unrelated recordings.
-        Equal timestamp/coordinate duplicates are deduplicated; conflicting equal timestamps
-        use a deterministic coordinate tie break and are counted in diagnostics.
+        Equal timestamp/coordinate duplicates are deduplicated. Equal-timestamp conflicts
+        use spatial_vote_context_v2: mean nearby fixes, prefer the largest pairwise-close
+        subset, then use unambiguous context from the same trajectory to break ties.
+        Unresolved timestamps are separated and break observation segments.
+        Mean contributors and rejected fixes are traceable in offline preprocessing outputs.
         No continuity is inferred between trajectory IDs or across excessive sampling gaps.
         A candidate may serve both Home and Office. Either or both roles may be unknown.
         Scores describe evidence under assumptions, never verified residence or employment.
@@ -72,7 +74,7 @@ paths:
                     inference_id: 01c33de4-fd82-5e48-b778-ffac02b00c1c
                     user_id: synthetic-user
                     model_version: dbscan-v1
-                    pipeline_version: 0.1.0
+                    pipeline_version: 0.2.0
                     status: completed
                     timezone: Asia/Shanghai
                     config:
@@ -80,6 +82,7 @@ paths:
                       distance_m: 100.0
                       min_stay_minutes: 10.0
                       max_gap_minutes: 5.0
+                      conflict_merge_threshold_m: 20.0
                       eps_m: 100.0
                       min_samples: 3
                       speed_warning_mps: 100.0
@@ -144,7 +147,7 @@ paths:
                     inference_id: 6378858a-ca91-5bd7-ab53-4a986212eb6a
                     user_id: synthetic-user
                     model_version: dbscan-v1
-                    pipeline_version: 0.1.0
+                    pipeline_version: 0.2.0
                     status: completed
                     timezone: Asia/Shanghai
                     config:
@@ -152,6 +155,7 @@ paths:
                       distance_m: 100.0
                       min_stay_minutes: 10.0
                       max_gap_minutes: 5.0
+                      conflict_merge_threshold_m: 20.0
                       eps_m: 100.0
                       min_samples: 3
                       speed_warning_mps: 100.0
@@ -342,7 +346,8 @@ components:
       additionalProperties: false
       description: |
         All fields optional in requests; responses include the resolved full configuration.
-        Defaults are hypotheses. Distance and duration must be finite and positive.
+        Defaults are hypotheses. Stay/group distance and duration must be finite and positive;
+        conflict_merge_threshold_m is finite and nonnegative.
         Timezone must be a recognized IANA zone; syntax alone cannot ensure recognition.
         Service boundary must validate cross-field window constraints before execution.
       properties:
@@ -350,6 +355,11 @@ components:
         distance_m: {type: number, exclusiveMinimum: 0, default: 100}
         min_stay_minutes: {type: number, exclusiveMinimum: 0, default: 10}
         max_gap_minutes: {type: number, exclusiveMinimum: 0, default: 5}
+        conflict_merge_threshold_m:
+          type: number
+          minimum: 0
+          default: 20
+          description: NB02 spatial/context vote threshold; exact duplicate positions count once
         eps_m: {type: number, exclusiveMinimum: 0, default: 100}
         min_samples: {type: integer, minimum: 1, default: 3}
         speed_warning_mps: {type: number, exclusiveMinimum: 0, default: 100}
@@ -477,7 +487,7 @@ components:
       additionalProperties: false
       required: [observed_minutes, observed_days, calendar_span_days, observed_day_fraction, observed_time_fraction, night_observed_days, work_observed_days, first_timestamp, last_timestamp]
       properties:
-        observed_minutes: {$ref: '#/components/schemas/Nonnegative', description: Union of within-trajectory adjacent-point intervals within max_gap; not stationary time}
+        observed_minutes: {$ref: '#/components/schemas/Nonnegative', description: Union of adjacent-point intervals within trajectory/observation segment and max_gap; not stationary time}
         observed_days: {$ref: '#/components/schemas/Count'}
         calendar_span_days: {$ref: '#/components/schemas/Count'}
         observed_day_fraction: {$ref: '#/components/schemas/Score'}
@@ -503,7 +513,23 @@ components:
         invalid_rows_removed: {$ref: '#/components/schemas/Count'}
         invalid_altitudes: {$ref: '#/components/schemas/Count'}
         duplicate_records_removed: {$ref: '#/components/schemas/Count'}
-        conflicting_timestamps_removed: {$ref: '#/components/schemas/Count'}
+        conflicting_timestamps_removed:
+          allOf: [{$ref: '#/components/schemas/Count'}]
+          deprecated: true
+          description: In 0.2.0 equals merged_extra_points + unresolved_conflict_rows; mean contributors are not deletions
+        conflict_policy: {type: string, enum: [spatial_vote_context_v2]}
+        conflict_groups: {$ref: '#/components/schemas/Count'}
+        conflict_positions: {$ref: '#/components/schemas/Count'}
+        merged_conflict_groups: {$ref: '#/components/schemas/Count'}
+        merged_source_points: {$ref: '#/components/schemas/Count'}
+        merged_extra_points: {$ref: '#/components/schemas/Count'}
+        unresolved_conflict_groups: {$ref: '#/components/schemas/Count'}
+        unresolved_conflict_rows: {$ref: '#/components/schemas/Count'}
+        resolved_conflict_groups: {$ref: '#/components/schemas/Count'}
+        context_resolved_groups: {$ref: '#/components/schemas/Count'}
+        outlier_conflict_rows: {$ref: '#/components/schemas/Count'}
+        missing_altitude_after: {$ref: '#/components/schemas/Count'}
+        breaks_due_to_conflict: {$ref: '#/components/schemas/Count'}
         gaps_over_limit: {$ref: '#/components/schemas/Count'}
         high_speed_segments: {$ref: '#/components/schemas/Count'}
         output_points: {$ref: '#/components/schemas/Count'}
@@ -520,7 +546,7 @@ components:
         inference_id: {type: string, format: uuid, description: Deterministic UUID for normalized input/model/config; not an authentication token}
         user_id: {type: string}
         model_version: {$ref: '#/components/schemas/ModelVersion'}
-        pipeline_version: {type: string, const: 0.1.0}
+        pipeline_version: {type: string, enum: [0.1.0, 0.2.0], description: 0.1.0 is legacy tie-break; 0.2.0 uses NB02 spatial/context voting}
         status: {type: string, const: completed}
         timezone: {type: string}
         config:

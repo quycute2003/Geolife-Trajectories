@@ -40,6 +40,12 @@ Schema đầy đủ ở `openapi.yaml`; xem `assumptions.md` để hiểu chính
 | location.observation_coverage | Cluster visited dates / user GPS-observed dates |
 | coverage | User-level observed intervals, dates, span, fractions và role days |
 | diagnostics | Input/removed/output counts, gaps/speed, stays/noise/cluster counts |
+| conflict_policy | 0.2.0 dùng spatial_vote_context_v2 giống NB02 |
+| merged_extra_points | Số hàng giảm do nhiều fixes góp vào một tọa độ mean; các fixes vẫn ở conflict trace |
+| unresolved_conflict_rows | Tên tương thích NB02: mọi conflict fixes tách khỏi cleaned output, gồm minority outliers và toàn nhóm unresolved |
+| unresolved_conflict_groups / outlier_conflict_rows | Tách số timestamps chưa giải quyết khỏi số fixes nằm ngoài cụm thắng |
+| observation_segment | Đoạn liên tục trong một user/trajectory; ngắt qua gap, unresolved timestamp hoặc boundary có sẵn |
+| conflicting_timestamps_removed | Alias legacy 0.2.0 = merged_extra_points + unresolved_conflict_rows, không phải số physical deletions |
 | home / office | status, reason, nullable candidate và alternatives |
 | evidence_score / components | Heuristic strength [0,1], không phải probability |
 | pois | Recurring locations khác selected Home/Office |

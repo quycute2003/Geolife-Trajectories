@@ -40,17 +40,25 @@ giữa centers và overlap observed events; đọc artifact riêng tư, không x
 
 ## Manual review
 
-1. Xem EDA: số dates, sampled-time coverage, gaps, speeds và thời gian quan sát.
-2. Xem `<user>-<model>.png`: toàn bộ observed extent và local 3km focus. Không có basemap/geocoding.
-   Plot subsample tối đa khoảng 15–30k GPS fixes để dễ render; inference dùng toàn bộ points.
-3. Xem `<user>-<model>-stays.csv`: kiểm tra một số intervals đầu/cuối, sampling gaps, noise labels.
-4. Xem JSON: all location features, Home/Office candidate + alternatives, role overlap, days/weeks,
-   dispersion và relative share. Travel regions có thể tạo candidates gây nhiễu.
-5. Copy `manual-review-template.csv` thành `manual-review.csv` để ghi nhãn proxy/uncertainty.
-   Script không ghi vào file có nhãn reviewer. Không điền nhãn bằng prediction rồi tính performance.
-6. Reviewer nên đọc temporal evidence và trajectories trước khi quyết định proxy labels;
-   nếu có thể, che prediction trong lần review đầu để giảm confirmation bias.
-7. Giữ toàn bộ review files và maps trong `artifacts/`, không commit Git.
+`artifacts/evaluation/manual-review-sample.csv` là bảng review được tạo từ kết quả đã chạy trên
+toàn bộ 182 users. Bảng có 32 dòng: 8 trường hợp được chọn có chủ đích để xem các tình huống khác
+nhau (dự đoán, từ chối, hai model bất đồng, Home/Office trùng vị trí, dữ liệu thưa và ứng viên
+phân tán). Đây là mẫu kiểm tra định tính, **không phải mẫu ngẫu nhiên để suy rộng tỷ lệ lỗi**.
+
+Mỗi user có bốn dòng (Home/Office × DBSCAN/heuristic). `candidate_cluster_id` là cluster được chọn
+nếu model dự đoán; nếu model trả `unknown`, đó là ứng viên xếp đầu để ta xem vì sao bị từ chối.
+Cluster IDs chỉ có nghĩa trong đúng user và model. Mở `map_file`, chọn user ở danh sách, rồi đối
+chiếu vị trí với cột thời gian/độ phân tán trong CSV. Cột `review_plausibility` có thể ghi
+`plausible`, `implausible`, hoặc `unclear`; ghi mức không chắc và lý do vào các cột cuối.
+
+Chỉ đánh giá **tính hợp lý của dấu vết thời gian/vị trí**. GPS không cho biết chắc một nơi là nhà
+hay văn phòng; không dùng nhận xét này làm ground truth, accuracy/F1, hoặc bằng chứng hiệu năng.
+Không sao chép nhãn dự đoán vào cột review. Bảng này chỉ là một mẫu review định tính và để trống
+các cột nhận xét cho reviewer.
+
+`manual-review.csv` và `manual-review-template.csv` là bảng cũ từ thí nghiệm subset ban đầu;
+không dùng chúng làm mẫu review kết quả toàn dataset. Artifacts và bản đồ nằm trong `artifacts/`
+đã được Git ignore.
 
 ## Diagnostics báo cáo
 

@@ -54,7 +54,7 @@ def test_haversine_units_and_dateline():
     assert haversine_m(0, 0, np.array([0, 0]), np.array([0, 1])).tolist() == pytest.approx([0, 111195.08], abs=.1)
 
 
-def test_audit_duplicate_conflict_invalid_and_speed_not_deleted(make_points):
+def test_audit_duplicate_invalid_and_unresolved_conflict(make_points):
     frame = make_points([0, 1, 2, 3])
     frame.loc[1, "longitude"] = 120
     frame.loc[2, "latitude"] = np.inf
@@ -63,11 +63,18 @@ def test_audit_duplicate_conflict_invalid_and_speed_not_deleted(make_points):
     conflict = duplicate.copy()
     conflict["latitude"] = 40
     clean, audit = preprocess(pd.concat([frame, duplicate, conflict]), Config())
-    assert len(clean) == 2
+    assert len(clean) == 1
     assert audit["duplicate_records_removed"] == 1
-    assert audit["conflicting_timestamps_removed"] == 1
+    assert audit["unresolved_conflict_rows"] == 2
+    assert audit["conflicting_timestamps_removed"] == 2
     assert audit["invalid_rows_removed"] == 2
-    assert audit["high_speed_segments"] == 1
+
+
+def test_high_speed_is_flagged_not_deleted(make_points):
+    frame = make_points([0, 1])
+    frame.loc[1, "longitude"] = 120
+    clean, audit = preprocess(frame, Config())
+    assert len(clean) == 2 and audit["high_speed_segments"] == 1
 
 
 def test_naive_and_non_utc_rejected(make_points):
@@ -78,7 +85,9 @@ def test_naive_and_non_utc_rejected(make_points):
 
 
 @pytest.mark.parametrize("kwargs", [{"distance_m": 0}, {"eps_m": float("nan")}, {"min_samples": True},
-                                   {"night_start_hour": 3}, {"work_end_hour": 4}])
+                                   {"night_start_hour": 3}, {"work_end_hour": 4},
+                                   {"conflict_merge_threshold_m": -1}, {"conflict_merge_threshold_m": True},
+                                   {"conflict_merge_threshold_m": float("nan")}])
 def test_bad_config(kwargs):
     with pytest.raises(ValueError):
         Config(**kwargs)

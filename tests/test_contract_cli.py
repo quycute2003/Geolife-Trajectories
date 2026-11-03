@@ -83,3 +83,56 @@ def test_cli_end_to_end_on_synthetic_directory(tmp_path, capsys):
     with pytest.raises(SystemExit) as exc:
         main(["infer", "--dataset", str(tmp_path / "Data"), "--users", "missing"])
     assert exc.value.code == 2
+
+
+def test_cli_defaults_to_all_users_and_exports_audit(tmp_path):
+    for user in ["000", "001"]:
+        source = tmp_path / "Data" / user / "Trajectory"
+        source.mkdir(parents=True)
+        text = "header\n" * 6
+        text += "39,116,0,100,0,2024-01-01,00:00:00\n"
+        text += "39.00001,116,0,100,0,2024-01-01,00:00:00\n"
+        text += "39,116,0,100,0,2024-01-01,00:05:00\n39,116,0,100,0,2024-01-01,00:10:00\n"
+        (source / "t.plt").write_text(text, encoding="utf-8")
+    output = tmp_path / "out"
+    assert main(["infer", "--dataset", str(tmp_path / "Data"), "--output", str(output), "--audit-points"]) == 0
+    audit = json.loads((output / "run-audit.json").read_text(encoding="utf-8"))
+    assert audit["status"] == "completed" and audit["scope"] == "full_dataset"
+    assert audit["completed_users"] == audit["expected_users"] == ["000", "001"]
+    assert audit["processed_trajectory_files"] == audit["expected_trajectory_files"] == 2
+    assert audit["input_points"] == 8 and audit["output_points"] == 6
+    for user in audit["completed_users"]:
+        result = json.loads((output / f"{user}-dbscan-v1.json").read_text(encoding="utf-8"))
+        assert result["diagnostics"]["conflict_policy"] == "spatial_vote_context_v2"
+        assert result["diagnostics"]["merged_extra_points"] == 1
+        trace = pd.read_csv(output / f"{user}-dbscan-v1-conflicts.csv")
+        assert len(trace) == 2 and trace["decision"].eq("mean_merged").all()
+        assert (output / f"{user}-dbscan-v1-removed.csv").is_file()
+        validator("InferenceResponse").validate(result)
+
+
+def test_cli_failure_does_not_report_full_dataset_completed(tmp_path):
+    for user, content in [("000", "39,116,0,100,0,2024-01-01,00:00:00\n"), ("001", "bad,field,count\n")]:
+        source = tmp_path / "Data" / user / "Trajectory"
+        source.mkdir(parents=True)
+        (source / "t.plt").write_text("header\n" * 6 + content, encoding="utf-8")
+    output = tmp_path / "out"
+    with pytest.raises(SystemExit):
+        main(["infer", "--dataset", str(tmp_path / "Data"), "--output", str(output)])
+    audit = json.loads((output / "run-audit.json").read_text(encoding="utf-8"))
+    assert audit["status"] == "failed" and audit["completed_users"] == ["000"]
+    assert audit["processed_trajectory_files"] < audit["expected_trajectory_files"]
+
+
+def test_cli_internal_failure_updates_run_audit(tmp_path, monkeypatch):
+    source = tmp_path / "Data/000/Trajectory"
+    source.mkdir(parents=True)
+    (source / "t.plt").write_text("header\n" * 6 + "39,116,0,100,0,2024-01-01,00:00:00\n", encoding="utf-8")
+    def fail(*args, **kwargs):
+        raise RuntimeError("synthetic internal failure")
+    monkeypatch.setattr("geolife_inference.cli.run_pipeline", fail)
+    output = tmp_path / "out"
+    with pytest.raises(RuntimeError, match="synthetic internal failure"):
+        main(["infer", "--dataset", str(tmp_path / "Data"), "--output", str(output)])
+    audit = json.loads((output / "run-audit.json").read_text(encoding="utf-8"))
+    assert audit["status"] == "failed" and audit["completed_users"] == []

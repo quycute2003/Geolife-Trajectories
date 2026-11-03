@@ -1,5 +1,75 @@
 # CP1 experimental results — 2026-10-31
 
+## Cập nhật 2026-11-03 — CLI DBSCAN 0.2.0 khớp NB02–05 toàn dataset
+
+Người dùng đã chạy standalone CLI với config baseline và --audit-points; run-audit ghi completed/full_dataset,
+đủ 182 users / 18.670 trajectories. Đối chiếu **mọi users và mọi saved records**, không chạy lại GPS/inference:
+
+| Mục | CLI và notebook |
+|---|---:|
+| Raw → cleaned points | 24.876.978 → 24.177.772 |
+| Stays | 10.339 |
+| DBSCAN locations / noise stays | 552 / 3.296 |
+| Home predicted / unknown users | 37 / 145 |
+| Office predicted / unknown users | 18 / 164 |
+| POIs, cộng mọi users | 202 |
+| Distinct conflict fixes trong trace | 709.851 |
+| Invalid/exact-duplicate removed rows | 146.915 |
+
+Không có sai khác ngoài float tolerance ở các per-user preprocessing counters, stay intervals/positions/
+durations/counts, toàn bộ per-stay cluster/noise labels, mọi coverage và location feature fields,
+Home/Office status/reason/candidate/components/alternatives và ordered POIs.
+Tolerance rtol=1e-10, atol=1e-8; sai lệch số thực lớn nhất quan sát được khoảng 8,9755e-9.
+Point traces khớp GPS/time/decision/spread; removed rows khớp theo multiset nội dung/reason.
+Record IDs không so trực tiếp vì NB02 gán toàn dataset còn CLI gán theo lượt đọc từng user.
+
+Report có fingerprints và phạm vi: `artifacts/pipeline/dbscan-v1/notebook-comparison.json` (gitignored).
+Schema validation: 182 responses CLI thực + 6 contract examples = 188 lượt pass.
+Đây là **kiểm tra tương đương implementation**, không đo accuracy hoặc xác nhận Home/Office thực tế.
+CLI heuristic 0.2.0 chưa chạy lại; heuristic notebook đã có kết quả full-data. Manual-review CSV lịch sử
+có 130 hàng nhưng 0 proxy labels/reviewers/notes đã điền. Đã chuẩn bị worksheet mới 32 dòng cho 8 users
+từ kết quả full-data; cột reviewer vẫn để trống, nên chưa có manual semantic evaluation.
+
+## Cập nhật 2026-11-02 — grouping toàn stays và map (NB04)
+
+Người dùng đã chạy NB04. Audit `completed/full_dataset`, fingerprints input khớp, cùng 10.339 stays
+ở cả hai phương pháp, thống kê đủ 182 users:
+
+| Phương pháp | Địa điểm | Stays được gom | Noise stays |
+|---|---:|---:|---:|
+| Heuristic, radius 100 m | 3.577 | 10.339 | 0 |
+| DBSCAN, eps 100 m / min_samples 3 | 552 | 7.043 | 3.296 |
+
+Theo yêu cầu xem map, xuất một HTML tương tác từ CSV có sẵn, không chạy lại grouping.
+Map giữ toàn bộ input, có bộ chọn mọi user/toàn bộ và hai phương pháp cạnh nhau, zoom, noise/extent,
+popup stay/cluster. Chưa dùng các counts này để kết luận phương pháp nào chính xác hơn.
+Phần trên ghi kết quả Home/Office toàn dataset mới nhất; các dòng này ghi lại bước review grouping trước đó.
+
+## Cập nhật 2026-11-02 — stay detection toàn dataset (NB03)
+
+Người dùng đã chạy NB03, audit `completed/full_dataset`. Đọc audit và CSV xác nhận đủ
+182 users / 18.670 trajectories / 24.177.772 cleaned points, không lấy mẫu.
+Baseline anchor 100 m / 10 phút / max gap 5 phút, tôn trọng observation_segment:
+
+- 10.339 stays của 151 users; 31 users không có stay đạt rule.
+- 0 stays chồng thời gian; 215.579,967 phút = 3.592,999 giờ trong stays.
+- 2.595.092 cleaned points thuộc stays, khoảng 10,7334% input; không phải tỷ lệ thời gian đứng yên.
+
+Sensitivity cũng đã được người dùng chạy trên toàn bộ 24.177.772 points mỗi cấu hình:
+
+| Cấu hình (radius m / duration phút) | Stays | Giờ trong stays | Overlap |
+|---|---:|---:|---:|
+| Baseline 100 / 10 | 10.339 | 3.592,999 | 0 |
+| 50 / 10 | 6.024 | 2.068,508 | 0 |
+| 200 / 10 | 14.371 | 5.188,689 | 0 |
+| 100 / 5 | 27.605 | 5.569,005 | 0 |
+| 100 / 20 | 3.174 | 1.959,505 | 0 |
+
+Đã trao đổi kết quả và người dùng cho phép chuyển phase. Nhiều stays hơn không chứng minh tốt hơn;
+100 m / 10 phút vẫn là baseline, chưa tối ưu bằng nhãn độc lập. Tạo NB04 so heuristic/DBSCAN trên
+cùng toàn bộ stays của baseline, với recurrence/dispersion/noise. Kết quả NB04 mới nhất ở phần trên;
+kết quả Home/Office mới nhất ở phần CLI/NB05 phía trên.
+
 ## Cập nhật 2026-11-02 — preprocessing toàn dataset
 
 Người dùng đã chạy NB02 với `spatial_vote_context_v2`, ngưỡng 20m. Audit xác nhận completed,
@@ -21,11 +91,11 @@ Giữ 39.806 long gaps và 51.686 high-speed pairs dưới dạng diagnostics, k
 
 Rule ưu tiên cụm đông nhất có mọi pair trong ngưỡng; nếu hòa, dùng context không-conflict trong cùng
 trajectory ±max_gap_minutes. Nếu vẫn hòa thì giữ riêng. Đây là heuristic, chưa có ground truth xác nhận fixes.
-Các đoạn quan sát phải được tôn trọng ở bước stay detection; chưa chạy notebook 03.
+Các đoạn quan sát được tôn trọng ở bước stay detection NB03; kết quả mới nhất ở phần trên.
 
 Các kết quả **inference/sensitivity bên dưới là thực nghiệm subset trước đây**, không phải đánh giá
-Home/Office trên toàn dataset. Core/CLI raw còn dùng baseline conflict policy cũ; NB02 giải quyết conflicts
-trước khi gọi core preprocessing. Không có HTTP endpoints hoặc mentor approval được khẳng định.
+Home/Office trên toàn dataset. Core/CLI raw 0.1.0 lúc đó còn dùng baseline conflict policy cũ; NB02 giải quyết conflicts
+trước khi gọi core preprocessing. Không có HTTP endpoints trong phạm vi CP1.
 
 ## Scope và provenance
 
@@ -124,4 +194,4 @@ Không lặp benchmark, không đo server latency hoặc sync/async; số đo kh
 Chưa inference toàn dataset; sample không đại diện mọi mobility pattern. Coverage thiếu, timezone assumption,
 gaps, night shifts, nhiều nơi ở, slow movement, jitter và greedy resets có thể gây lỗi.
 Điểm score và tham số chưa calibrated/optimized. OpenAPI limits chỉ đề xuất, chưa được load test hoặc enforce.
-Mentor approval và independent semantic review vẫn đang chờ.
+Independent semantic review chưa có; không có nhãn ground truth để đo accuracy.

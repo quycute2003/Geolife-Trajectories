@@ -3,6 +3,7 @@ timezone = "Asia/Shanghai"
 distance_m = 100.0
 min_stay_minutes = 10.0
 max_gap_minutes = 5.0
+conflict_merge_threshold_m = 20.0
 eps_m = 100.0
 min_samples = 3
 speed_warning_mps = 100.0
