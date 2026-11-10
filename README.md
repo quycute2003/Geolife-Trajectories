@@ -101,7 +101,7 @@ khác để giữ lần chạy trước. Thời gian thực nghiệm là offline
 Người dùng đã chạy CLI DBSCAN 0.2.0 trên toàn dataset; đã đối chiếu mọi saved outputs với NB02–05:
 counters, stays, memberships, coverage/features, predictions và point traces đều khớp trong float tolerance.
 Report ở `artifacts/pipeline/dbscan-v1/notebook-comparison.json`; các artifact notebook được giữ nguyên.
-CLI heuristic 0.2.0 chưa chạy lại, còn các tests synthetic đã kiểm tra cả hai models.
+CLI heuristic 0.2.0 cũng đã chạy toàn dataset. Xem báo cáo benchmark CP1 để đối chiếu hai model.
 Bộ review định tính 8 users hiện tại nằm ở `artifacts/evaluation/manual-review-sample.csv`; chưa có nhãn reviewer.
 
 ## Kiến trúc
@@ -121,6 +121,12 @@ Cả hai cùng preprocessing, stay detector, temporal features và output contra
 Đọc điều khoản trong User Guide 1.3 trước khi sử dụng dataset; guide ghi non-commercial use
 và có giới hạn phân phối. Không thêm ZIP, PLT, tọa độ suy luận hoặc bản đồ người dùng vào Git.
 Notebook dùng một file duy nhất, có thể giữ cả code, bảng kết quả và biểu đồ để học.
-Không tự động push GitHub. CP1 dừng ở pipeline offline và OpenAPI draft; không có endpoint đang chạy.
+CP1 dừng ở pipeline offline và OpenAPI draft; không có endpoint đang chạy.
 Sampling thiếu, lịch làm việc khác giờ hành chính, du lịch, GPS jitter và đi bộ chậm đều có thể gây sai.
 Các ngưỡng mặc định là giả thuyết, chưa tối ưu hoặc xác nhận bằng nhãn độc lập.
+
+## Bàn giao CP01
+
+- [Báo cáo benchmark B1–B6](reports/cp1/benchmark.md) và [tóm tắt kết quả](reports/cp1/summary.md).
+- [Slide báo cáo 17 trang](exports/CP1_GeoLife_BaoCao_17slides.pptx).
+- [Bảng số liệu, biểu đồ và audit tổng hợp](reports/cp1/artifacts/README.md).

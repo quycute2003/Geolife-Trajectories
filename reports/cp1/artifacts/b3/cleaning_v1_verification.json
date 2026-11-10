@@ -1,0 +1,13 @@
+{
+  "status": "verified",
+  "users": 182,
+  "policies": 6,
+  "raw_points": 24876978,
+  "trajectories": 18670,
+  "output_hashes_verified": 1110,
+  "baseline_code_sha256_verified": "1cf3375c17bc63863a1348423e1483e91775d6d748962b5bc14ea665fc57d612",
+  "baseline_parity_users": 182,
+  "runtime_seconds": 3918.814840200008,
+  "sampled_peak_working_set_bytes": 487596032,
+  "note": "Verified before concat warning fix; saved B3 artifacts remain unchanged."
+}

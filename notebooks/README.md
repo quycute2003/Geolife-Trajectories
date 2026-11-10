@@ -152,3 +152,67 @@ Xem lệnh full-data và cờ `--audit-points` trong README gốc. Core đã đ�
 và các bước notebook bằng synthetic fixtures. Sau đó đã đối chiếu CLI DBSCAN full-data người dùng chạy:
 mọi counters/stays/memberships/coverage/features/predictions/traces khớp. CLI heuristic mới chưa chạy lại.
 Các outputs/ghi chú/sensitivity settings hiện có trong notebooks được giữ nguyên.
+
+## Benchmark CP1: notebook 06 và 07
+
+- `06_cp1_benchmark.ipynb`: B1 inventory/profile đã chạy; giữ outputs và setting đã lưu.
+- `07_cp1_b2_synthetic.ipynb`: B2 protocol/generator, mở và chạy từ đầu độc lập với NB06.
+  Preparation và generation mặc định tắt. Điền compute đã dùng, chạy preparation rồi đọc cohort/quy mô
+  trước khi bật generation. Không cần chạy lại scan B1 để tiếp tục B2.
+
+## Chạy notebook 08 — B3 cleaning
+
+Mở `08_cp1_b3_cleaning.ipynb`, dùng kernel Python (GeoLife) và chạy từ đầu. RUN_B3 đã bật;
+ledger tự lấy sau B2 selection. ADDITIONAL_COMPUTE_SECONDS chỉ cần sửa nếu có job mới/failed khác
+sau B2. Job dùng output riêng `artifacts/benchmark/b3/cleaning_v1`; đọc audit nếu namespace đã có,
+không ghi đè. Baseline và corpus B2 được giữ nguyên. Sau completed, các cell cuối hiển thị counts,
+stay-diff và dwell delta để đọc trước B4. Không chạy lại notebook 06/07 để dùng notebook 08.
+
+## Chạy notebook 09 — B4 detector
+
+Mở `09_cp1_b4_detectors.ipynb`, chọn kernel **Python (GeoLife)** rồi **Run All**.
+Mặc định `WORKERS=10`, `RESUME=True`: tổng hợp selection chạy nền, tối đa 10 user cùng lúc;
+chưa bật dữ liệu thật hoặc xác nhận cuối. Giữ nguyên checkpoint cũ, không chạy lại user đã xong.
+Grid chung đủ 5 detector × radius 50/100/150/200 m × dwell 10/20 phút =40 tổ hợp.
+ST-DBSCAN khảo sát riêng 9 bộ eps_time/MinPts tại 100 m/10 phút; tái dùng 1 bộ, tổng 48 tổ hợp.
+Mỗi cấu hình chung có figure cùng 5 thuật toán; không gộp mọi kịch bản thành một F1.
+
+Chạy lại cell mục 3 để xem trạng thái. Khi job nền chưa completed, cell bảng/plot chưa thực hiện;
+khi completed, Run All để dựng bảng/plot. Muốn dừng nền, chạy `parallel.request_stop(OUT)` trong cell;
+nút Interrupt notebook không dừng coordinator độc lập. Muốn tiếp tục thì chạy lại mục 3.
+
+Mục **3a — Theo dõi trực tiếp** tự cập nhật mỗi 3 giây: số user hoàn tất, user đang chạy và
+thời gian của từng user, hoạt động CPU/RAM của từng tiến trình, thời điểm log cập nhật.
+Cell này tự tìm dự án và chỉ đọc trạng thái, có thể chạy riêng mà không khởi động lại job.
+Interrupt cell theo dõi chỉ tắt bảng; job nền vẫn chạy. Khi chạy Run All, bảng chờ tới lúc job
+hoàn tất/dừng rồi mới chuyển tiếp; đặt `LIVE_MONITOR=False` nếu chỉ muốn xem snapshot ở mục 3.
+
+Từ 2026-11-05, launcher `benchmark_parallel_scaled.py` mở rộng capacity lên 10 theo yêu cầu
+người dùng, có scaling policy/hash riêng. Engine 3 tiến trình gốc và code chấm giữ nguyên;
+17 user đã hoàn tất được giữ khi chuyển. Mục 3a tự đọc số worker hiện tại, không cần sửa bảng.
+Sau khi đọc tổng hợp, bật `RUN_REAL=True` và `RUN_DECIDE=True` rồi chạy lại từ đầu để xử lý
+đủ dataset thật và xét điều kiện. Stage completed được kiểm hash rồi tái dùng. Nếu synthetic/real
+bị ngắt, đặt `RESUME=True` để tiếp tục checkpoint theo user, không xóa output hoặc sửa code đã khóa.
+Các stage bảng/plot/decision chưa hỗ trợ resume nếu thất bại; dừng để kiểm tra nguyên nhân.
+Final mặc định đóng; chỉ bật `RUN_FINAL=True` sau khi một ứng viên qua đủ (a)–(d) và đã khóa.
+Không winner thì giữ baseline, không chạy final. Ledger tự lấy từ B3 và các stage B4 đã ghi;
+trần 24 giờ tích lũy giữ nguyên. RAM tính tổng coordinator và workers; không cấp lại budget mỗi worker.
+Timing tổng hợp lẫn serial/parallel chỉ mô tả, gate runtime vẫn dùng lượt real tuần tự.
+Medoid chính xác có thể nặng, chưa có số đo runtime full grid.
+Không cần chạy lại NB06–NB08. Phụ lục: `reports/cp1/detector_protocol.md`.
+
+## Chạy notebook 10 — B5 Home/Office
+
+Mở `10_cp1_b5_roles.ipynb`, chọn kernel **Python (GeoLife)** rồi **Run All**. Các cờ B5 đã bật sẵn.
+Tái dùng stays fixed-anchor 100/150 m, cùng dwell 10 phút, từ B4 real completed; không chạy lại detector.
+So score NB05 với rule đơn giản, báo riêng hai phương pháp grouping; đủ 182 user kể cả unknown.
+Nhánh 100 m + score phải parity với NB05. Không ghi đè baseline hoặc thay quyết định B4.
+
+Context đọc cache GPS B4 theo trajectory để tính lại coverage, dịch giờ ±1, timezone và hai khối
+28 ngày. Đây vẫn là job full-data, cần để cell chạy tới khi completed. Interrupt giữ checkpoint
+user đã xong; `RESUME_B5=True` để tiếp tục. Output riêng: `artifacts/benchmark/b5/roles_v1`.
+Mục 6 tự hiển thị mọi plot đã tạo, kèm rates, reason, cohort và paired transitions.
+
+Dependencies timezone đã được thêm vào nhóm notebook và cài ở `.venv`; trên máy khác dùng
+`uv sync --group notebook`. Lock giữ versions/hash; nếu đổi code/config sau chạy cần namespace mới.
+Compute nối ledger B4, trần tích lũy 24 giờ giữ nguyên. Protocol: `reports/cp1/role_protocol.md`.

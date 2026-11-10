@@ -1,5 +1,27 @@
 # Assumptions, algorithms và failure cases
 
+## Trạng thái sau benchmark — 2026-11-06
+
+Các công thức và mặc định core 0.2.0 dưới đây vẫn mô tả **baseline 100 m/10 phút**.
+Người dùng chọn **fixed-anchor 150 m/10 phút** để tiếp tục và so downstream B5 với baseline;
+cleaning vote20 và score Home/Office giữ nguyên. Lựa chọn không đồng nghĩa đã vượt cổng B4 hoặc
+đã sửa default CLI/service. Grouping eps vẫn **100 m**, DBSCAN MinPts **3**; không đổi theo stay radius.
+
+B4 đã so 48 cấu hình tổng hợp và 40 trên GPS thật; B5 đủ 182 user. Chi tiết và giới hạn:
+[benchmark](../reports/cp1/benchmark.md), [evaluation](evaluation.md).
+
+- Cả 100/150 m đều là engineering assumptions: 150 m chịu outlier tốt hơn nhưng có FP/merge cao hơn.
+  **100 m/10 phút chưa được chứng minh tối ưu**; 150 m cũng chưa được chứng nhận tối ưu.
+- ST-DBSCAN spatial eps giới hạn neighborhood, không giới hạn toàn cluster; bộ 150 m/300 giây/3
+  đã tạo event nối dài 9,06 giờ/888,6 km. Không dùng F1 cao ở vài ô tổng hợp để bỏ qua failure này.
+- Score phức tạp không tự là xác suất/tốt hơn rule đơn giản. B5 cho thấy khác biệt lớn về abstention;
+  agreement trên nhóm cùng predicted không xác minh độ đúng hoặc ổn định trên mọi user.
+- Mặc định timezone core vẫn Asia/Shanghai. **B5 ablation** tra zone mọi GPS fix và cluster center,
+  IANA offset lịch sử, không chọn zone đa số của user. Gán valid pair theo fix trái là giả định tối
+  đa 5 phút; polygon hiện tại không xác minh biên zone lịch sử/giờ sinh hoạt tại mọi vùng.
+- Core Home/Office không có semantic ground truth. F1/precision/recall B4 chỉ được chấm trên
+  đáp án event tổng hợp, không chuyển thành accuracy role trên GeoLife thật.
+
 ## Thời gian và dữ liệu
 
 - GeoLife date/time được hiểu là UTC theo User Guide 1.3. Không dùng timezone của máy.
@@ -115,5 +137,6 @@ trả thêm toàn bộ bảng ứng viên cho notebook xem, không thay tie-brea
 User không có cluster vẫn có hàng unknown; POIs có thể chứa ứng viên Home/Office chưa được chọn.
 Map chỉ đặt H/O/H+O/P ở cluster đã được chọn, không đặt marker cho unknown.
 NB05 đã được người dùng chạy toàn dataset (37 Home / 18 Office cho DBSCAN), nhưng chưa có nhãn thật
-để đo accuracy. Core/CLI 0.2.0 đã được kiểm tra parity synthetic cả hai models; lượt CLI DBSCAN full-data
-do người dùng chạy đã khớp các saved outputs NB02–05 trong float tolerance. CLI heuristic mới chưa chạy lại.
+để đo accuracy. Core/CLI 0.2.0 đã được kiểm tra parity synthetic cả hai models; CLI DBSCAN full-data và heuristic
+full-data (B1) đều đã khớp saved outputs NB02–05 trong float tolerance. B5 100 m + score tiếp tục
+parity với NB05 đủ 182 user; đây là parity implementation, không phải accuracy Home/Office.

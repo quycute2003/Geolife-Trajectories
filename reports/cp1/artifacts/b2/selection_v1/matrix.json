@@ -1,0 +1,586 @@
+[
+  {
+    "group": "main",
+    "duration_group": 0,
+    "rms": 5,
+    "family": "gaussian",
+    "modifier": "none",
+    "cell_id": "main_ea17f068adf5"
+  },
+  {
+    "group": "main",
+    "duration_group": 0,
+    "rms": 5,
+    "family": "drift",
+    "modifier": "none",
+    "cell_id": "main_f2386c6818a2"
+  },
+  {
+    "group": "main",
+    "duration_group": 0,
+    "rms": 5,
+    "family": "outlier",
+    "modifier": "none",
+    "cell_id": "main_7ccb7f4b9690"
+  },
+  {
+    "group": "main",
+    "duration_group": 0,
+    "rms": 15,
+    "family": "gaussian",
+    "modifier": "none",
+    "cell_id": "main_270f0c50503c"
+  },
+  {
+    "group": "main",
+    "duration_group": 0,
+    "rms": 15,
+    "family": "drift",
+    "modifier": "none",
+    "cell_id": "main_ad8a5dba3cb1"
+  },
+  {
+    "group": "main",
+    "duration_group": 0,
+    "rms": 15,
+    "family": "outlier",
+    "modifier": "none",
+    "cell_id": "main_c18112753557"
+  },
+  {
+    "group": "main",
+    "duration_group": 0,
+    "rms": 30,
+    "family": "gaussian",
+    "modifier": "none",
+    "cell_id": "main_295f2b5ebb69"
+  },
+  {
+    "group": "main",
+    "duration_group": 0,
+    "rms": 30,
+    "family": "drift",
+    "modifier": "none",
+    "cell_id": "main_cd446b17b1a1"
+  },
+  {
+    "group": "main",
+    "duration_group": 0,
+    "rms": 30,
+    "family": "outlier",
+    "modifier": "none",
+    "cell_id": "main_f7b45ed99b18"
+  },
+  {
+    "group": "stress",
+    "duration_group": 0,
+    "rms": 100,
+    "family": "gaussian",
+    "modifier": "none",
+    "cell_id": "stress_4ecd35b1a3d0"
+  },
+  {
+    "group": "stress",
+    "duration_group": 0,
+    "rms": 100,
+    "family": "drift",
+    "modifier": "none",
+    "cell_id": "stress_b9b1a4e2f0fe"
+  },
+  {
+    "group": "stress",
+    "duration_group": 0,
+    "rms": 100,
+    "family": "outlier",
+    "modifier": "none",
+    "cell_id": "stress_ff7e2ede19ef"
+  },
+  {
+    "group": "dropout",
+    "duration_group": 0,
+    "rms": 15,
+    "family": "drift",
+    "modifier": "drop_empirical",
+    "cell_id": "dropout_7b801d335e70"
+  },
+  {
+    "group": "dropout",
+    "duration_group": 0,
+    "rms": 15,
+    "family": "drift",
+    "modifier": "drop25",
+    "cell_id": "dropout_13681e48c65c"
+  },
+  {
+    "group": "dropout",
+    "duration_group": 0,
+    "rms": 15,
+    "family": "drift",
+    "modifier": "drop50",
+    "cell_id": "dropout_185904227d54"
+  },
+  {
+    "group": "main",
+    "duration_group": 1,
+    "rms": 5,
+    "family": "gaussian",
+    "modifier": "none",
+    "cell_id": "main_69fcfc5bc5b2"
+  },
+  {
+    "group": "main",
+    "duration_group": 1,
+    "rms": 5,
+    "family": "drift",
+    "modifier": "none",
+    "cell_id": "main_473a8b02f234"
+  },
+  {
+    "group": "main",
+    "duration_group": 1,
+    "rms": 5,
+    "family": "outlier",
+    "modifier": "none",
+    "cell_id": "main_76b37e07aaad"
+  },
+  {
+    "group": "main",
+    "duration_group": 1,
+    "rms": 15,
+    "family": "gaussian",
+    "modifier": "none",
+    "cell_id": "main_2ce6bcc28a2f"
+  },
+  {
+    "group": "main",
+    "duration_group": 1,
+    "rms": 15,
+    "family": "drift",
+    "modifier": "none",
+    "cell_id": "main_a1bc0ec00816"
+  },
+  {
+    "group": "main",
+    "duration_group": 1,
+    "rms": 15,
+    "family": "outlier",
+    "modifier": "none",
+    "cell_id": "main_e8adf9192d7d"
+  },
+  {
+    "group": "main",
+    "duration_group": 1,
+    "rms": 30,
+    "family": "gaussian",
+    "modifier": "none",
+    "cell_id": "main_29e7b583513f"
+  },
+  {
+    "group": "main",
+    "duration_group": 1,
+    "rms": 30,
+    "family": "drift",
+    "modifier": "none",
+    "cell_id": "main_7c89c6b639d9"
+  },
+  {
+    "group": "main",
+    "duration_group": 1,
+    "rms": 30,
+    "family": "outlier",
+    "modifier": "none",
+    "cell_id": "main_c2f7bda59d66"
+  },
+  {
+    "group": "stress",
+    "duration_group": 1,
+    "rms": 100,
+    "family": "gaussian",
+    "modifier": "none",
+    "cell_id": "stress_5f1cb9ca9ed5"
+  },
+  {
+    "group": "stress",
+    "duration_group": 1,
+    "rms": 100,
+    "family": "drift",
+    "modifier": "none",
+    "cell_id": "stress_6562e25faba6"
+  },
+  {
+    "group": "stress",
+    "duration_group": 1,
+    "rms": 100,
+    "family": "outlier",
+    "modifier": "none",
+    "cell_id": "stress_2d83de4efc6f"
+  },
+  {
+    "group": "dropout",
+    "duration_group": 1,
+    "rms": 15,
+    "family": "drift",
+    "modifier": "drop_empirical",
+    "cell_id": "dropout_b3104d749b1b"
+  },
+  {
+    "group": "dropout",
+    "duration_group": 1,
+    "rms": 15,
+    "family": "drift",
+    "modifier": "drop25",
+    "cell_id": "dropout_18e0862f0e59"
+  },
+  {
+    "group": "dropout",
+    "duration_group": 1,
+    "rms": 15,
+    "family": "drift",
+    "modifier": "drop50",
+    "cell_id": "dropout_43886631e066"
+  },
+  {
+    "group": "main",
+    "duration_group": 2,
+    "rms": 5,
+    "family": "gaussian",
+    "modifier": "none",
+    "cell_id": "main_b31387a23597"
+  },
+  {
+    "group": "main",
+    "duration_group": 2,
+    "rms": 5,
+    "family": "drift",
+    "modifier": "none",
+    "cell_id": "main_c8f0fde92325"
+  },
+  {
+    "group": "main",
+    "duration_group": 2,
+    "rms": 5,
+    "family": "outlier",
+    "modifier": "none",
+    "cell_id": "main_99afaf0b6a6a"
+  },
+  {
+    "group": "main",
+    "duration_group": 2,
+    "rms": 15,
+    "family": "gaussian",
+    "modifier": "none",
+    "cell_id": "main_df70fd797f6a"
+  },
+  {
+    "group": "main",
+    "duration_group": 2,
+    "rms": 15,
+    "family": "drift",
+    "modifier": "none",
+    "cell_id": "main_32aab6848f21"
+  },
+  {
+    "group": "main",
+    "duration_group": 2,
+    "rms": 15,
+    "family": "outlier",
+    "modifier": "none",
+    "cell_id": "main_1720c10801c6"
+  },
+  {
+    "group": "main",
+    "duration_group": 2,
+    "rms": 30,
+    "family": "gaussian",
+    "modifier": "none",
+    "cell_id": "main_1153681e6de3"
+  },
+  {
+    "group": "main",
+    "duration_group": 2,
+    "rms": 30,
+    "family": "drift",
+    "modifier": "none",
+    "cell_id": "main_4f864e7e024c"
+  },
+  {
+    "group": "main",
+    "duration_group": 2,
+    "rms": 30,
+    "family": "outlier",
+    "modifier": "none",
+    "cell_id": "main_121ee21ec5ff"
+  },
+  {
+    "group": "stress",
+    "duration_group": 2,
+    "rms": 100,
+    "family": "gaussian",
+    "modifier": "none",
+    "cell_id": "stress_485773e829fa"
+  },
+  {
+    "group": "stress",
+    "duration_group": 2,
+    "rms": 100,
+    "family": "drift",
+    "modifier": "none",
+    "cell_id": "stress_2633111dc5f9"
+  },
+  {
+    "group": "stress",
+    "duration_group": 2,
+    "rms": 100,
+    "family": "outlier",
+    "modifier": "none",
+    "cell_id": "stress_ecc71c52c788"
+  },
+  {
+    "group": "dropout",
+    "duration_group": 2,
+    "rms": 15,
+    "family": "drift",
+    "modifier": "drop_empirical",
+    "cell_id": "dropout_92c96a2476ec"
+  },
+  {
+    "group": "dropout",
+    "duration_group": 2,
+    "rms": 15,
+    "family": "drift",
+    "modifier": "drop25",
+    "cell_id": "dropout_5b82385de47f"
+  },
+  {
+    "group": "dropout",
+    "duration_group": 2,
+    "rms": 15,
+    "family": "drift",
+    "modifier": "drop50",
+    "cell_id": "dropout_8be4924d2ac8"
+  },
+  {
+    "group": "main",
+    "duration_group": 3,
+    "rms": 5,
+    "family": "gaussian",
+    "modifier": "none",
+    "cell_id": "main_b69895f0b18c"
+  },
+  {
+    "group": "main",
+    "duration_group": 3,
+    "rms": 5,
+    "family": "drift",
+    "modifier": "none",
+    "cell_id": "main_9b96464a7deb"
+  },
+  {
+    "group": "main",
+    "duration_group": 3,
+    "rms": 5,
+    "family": "outlier",
+    "modifier": "none",
+    "cell_id": "main_b26f438f1a75"
+  },
+  {
+    "group": "main",
+    "duration_group": 3,
+    "rms": 15,
+    "family": "gaussian",
+    "modifier": "none",
+    "cell_id": "main_a97792c5bfe7"
+  },
+  {
+    "group": "main",
+    "duration_group": 3,
+    "rms": 15,
+    "family": "drift",
+    "modifier": "none",
+    "cell_id": "main_82bb0620ae75"
+  },
+  {
+    "group": "main",
+    "duration_group": 3,
+    "rms": 15,
+    "family": "outlier",
+    "modifier": "none",
+    "cell_id": "main_c9636d5775b8"
+  },
+  {
+    "group": "main",
+    "duration_group": 3,
+    "rms": 30,
+    "family": "gaussian",
+    "modifier": "none",
+    "cell_id": "main_96450801e5b7"
+  },
+  {
+    "group": "main",
+    "duration_group": 3,
+    "rms": 30,
+    "family": "drift",
+    "modifier": "none",
+    "cell_id": "main_ffb0db42afaa"
+  },
+  {
+    "group": "main",
+    "duration_group": 3,
+    "rms": 30,
+    "family": "outlier",
+    "modifier": "none",
+    "cell_id": "main_f8333c5bf9c3"
+  },
+  {
+    "group": "stress",
+    "duration_group": 3,
+    "rms": 100,
+    "family": "gaussian",
+    "modifier": "none",
+    "cell_id": "stress_23d36274cf1f"
+  },
+  {
+    "group": "stress",
+    "duration_group": 3,
+    "rms": 100,
+    "family": "drift",
+    "modifier": "none",
+    "cell_id": "stress_05899f1cf429"
+  },
+  {
+    "group": "stress",
+    "duration_group": 3,
+    "rms": 100,
+    "family": "outlier",
+    "modifier": "none",
+    "cell_id": "stress_ee65d36c8e7a"
+  },
+  {
+    "group": "dropout",
+    "duration_group": 3,
+    "rms": 15,
+    "family": "drift",
+    "modifier": "drop_empirical",
+    "cell_id": "dropout_108a13852c2d"
+  },
+  {
+    "group": "dropout",
+    "duration_group": 3,
+    "rms": 15,
+    "family": "drift",
+    "modifier": "drop25",
+    "cell_id": "dropout_8aeaea4b0944"
+  },
+  {
+    "group": "dropout",
+    "duration_group": 3,
+    "rms": 15,
+    "family": "drift",
+    "modifier": "drop50",
+    "cell_id": "dropout_690e9fb5a3bb"
+  },
+  {
+    "group": "unobservable",
+    "duration_group": 2,
+    "rms": 15,
+    "family": "drift",
+    "modifier": "drop_all",
+    "cell_id": "unobservable_2efdb8893d58"
+  },
+  {
+    "group": "two_stops",
+    "duration_group": 2,
+    "rms": 15,
+    "family": "drift",
+    "modifier": "none",
+    "separation_m": 25,
+    "connector_seconds": 120,
+    "cell_id": "two_stops_fb242bc78845"
+  },
+  {
+    "group": "two_stops",
+    "duration_group": 2,
+    "rms": 15,
+    "family": "drift",
+    "modifier": "none",
+    "separation_m": 25,
+    "connector_seconds": 600,
+    "cell_id": "two_stops_4852f665a3a9"
+  },
+  {
+    "group": "two_stops",
+    "duration_group": 2,
+    "rms": 15,
+    "family": "drift",
+    "modifier": "none",
+    "separation_m": 75,
+    "connector_seconds": 120,
+    "cell_id": "two_stops_ffad6126233b"
+  },
+  {
+    "group": "two_stops",
+    "duration_group": 2,
+    "rms": 15,
+    "family": "drift",
+    "modifier": "none",
+    "separation_m": 75,
+    "connector_seconds": 600,
+    "cell_id": "two_stops_ca54c009267f"
+  },
+  {
+    "group": "two_stops",
+    "duration_group": 2,
+    "rms": 15,
+    "family": "drift",
+    "modifier": "none",
+    "separation_m": 150,
+    "connector_seconds": 120,
+    "cell_id": "two_stops_196d2529ad04"
+  },
+  {
+    "group": "two_stops",
+    "duration_group": 2,
+    "rms": 15,
+    "family": "drift",
+    "modifier": "none",
+    "separation_m": 150,
+    "connector_seconds": 600,
+    "cell_id": "two_stops_c4f9e39fcec9"
+  },
+  {
+    "group": "negative",
+    "duration_group": 2,
+    "rms": 15,
+    "family": "drift",
+    "modifier": "none",
+    "negative_kind": "pure_move",
+    "cell_id": "negative_03844fc763b5"
+  },
+  {
+    "group": "negative",
+    "duration_group": 2,
+    "rms": 15,
+    "family": "drift",
+    "modifier": "none",
+    "negative_kind": "slow",
+    "cell_id": "negative_5ac646672ffc"
+  },
+  {
+    "group": "negative",
+    "duration_group": 2,
+    "rms": 15,
+    "family": "drift",
+    "modifier": "none",
+    "negative_kind": "creeping",
+    "cell_id": "negative_0182d82cbf9c"
+  },
+  {
+    "group": "negative",
+    "duration_group": 2,
+    "rms": 15,
+    "family": "drift",
+    "modifier": "none",
+    "negative_kind": "red_light",
+    "cell_id": "negative_d2e1a91987f4"
+  }
+]

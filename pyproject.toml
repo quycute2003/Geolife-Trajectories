@@ -13,7 +13,14 @@ dependencies = [
 
 [dependency-groups]
 dev = ["pytest==9.0.3", "PyYAML==6.0.3", "openapi-spec-validator>=0.7.2,<0.9", "matplotlib>=3.9,<3.11"]
-notebook = ["ipykernel>=6.30,<8", "nbclient>=0.10,<0.11", "nbformat>=5.10,<6", "jupyterlab>=4.4,<5"]
+notebook = [
+    "ipykernel>=6.30,<8",
+    "nbclient>=0.10,<0.11",
+    "nbformat>=5.10,<6",
+    "jupyterlab>=4.4,<5",
+    "timezonefinder==9.0.0",
+    "timezonefinder-data==3.2026.3.post1",
+]
 
 [project.scripts]
 geolife = "geolife_inference.cli:main"

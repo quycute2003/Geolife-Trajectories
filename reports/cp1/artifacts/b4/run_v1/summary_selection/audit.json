@@ -1,0 +1,18 @@
+{
+  "status": "completed",
+  "lock_hash": "f4853e1900853626731a2a2de04fc42da7302a196bf85d8e29bf919167b7a9dd",
+  "rows": 3408,
+  "users": 81,
+  "configurations": 48,
+  "output_hashes": {
+    "per_user.csv.gz": "f366e75bdceca9800783510107a4f5709597bf500467999eb5c343cbeb375261",
+    "macro_by_cell.csv": "dc28306dc3df7fd92fb2229289fda8690ff8cc8e58f8af25e0f1798d94377c4b",
+    "timing_per_user.csv": "d0dc0398d912025409133ce1dbe9a4d196a46d85ae9fb2c949107347df91c27c"
+  },
+  "attempt_elapsed_seconds": 16.69233989999998,
+  "compute_used_after_seconds": 39473.162349299986,
+  "sampled_peak_working_set_bytes": 369225728,
+  "ram_cap_bytes": 463235072,
+  "config_compute_seconds": {},
+  "config_process_ws_peak": {}
+}

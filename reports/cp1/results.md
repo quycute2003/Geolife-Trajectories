@@ -1,3 +1,29 @@
+# CP1 — kết quả và lịch sử thực nghiệm
+
+## Kết quả hiện tại — 2026-11-06
+
+B1–B5 đã có outputs completed theo phạm vi công bố. Đọc [báo cáo benchmark](benchmark.md) cho
+số liệu mới, decision table, audits và giới hạn; [summary.md](summary.md) là bản tóm tắt để trình bày.
+
+- Giữ cleaning vote20. Người dùng chọn fixed-anchor **150 m/10 phút** để tiếp tục và giữ
+  **100 m/10 phút** làm đối chứng; score Home/Office hiện tại được giữ cùng rule đơn giản để so sánh.
+- B4: 48 cấu hình trên tổng hợp, 40 trên GPS thật. Bảng khảo sát B4 dùng 81 source users selection;
+  không có winner xác nhận, final chưa sinh/mở, runtime real lẫn tuần tự/song song chỉ mô tả.
+- B5: đủ 182 users, 17.472 decision rows, baseline score parity với NB05. Với grouping DBSCAN,
+  150 m + score cho **39 Home/143 unknown**, **22 Office/160 unknown**; 100 m + score là 37/145 và 18/164.
+  Agreement cao trên nhóm cùng predicted không xác nhận accuracy hoặc ổn định dài hạn.
+- Heuristic CLI 0.2.0 đã chạy đủ dataset và parity trong B1; câu “chưa chạy” ở nhật ký dưới là
+  trạng thái lịch sử. Gán nhãn thủ công đã bỏ ngày 2026-11-04; các worksheet cũ chỉ là artifacts
+  lịch sử, không có vai trò reference/evaluation hiện tại.
+- Core/config/artifacts baseline chưa đổi mặc định 100 m/10 phút; chưa triển khai service hoặc CP2.
+  Báo cáo được cập nhật, slide chưa thay đổi.
+
+## Nhật ký đã đóng
+
+Các số liệu, test counts và trạng thái dưới đây giữ nguyên theo ngày ghi. Các mục subset không
+đại diện toàn dataset. Khi khác trạng thái hiện tại, dùng phần cập nhật ngày 2026-11-06 và báo cáo
+benchmark; không lấy các câu “chưa chạy” trong nhật ký làm kết luận hiện tại.
+
 # CP1 experimental results — 2026-10-31
 
 ## Cập nhật 2026-11-03 — CLI DBSCAN 0.2.0 khớp NB02–05 toàn dataset

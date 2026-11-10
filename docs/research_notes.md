@@ -1,5 +1,29 @@
 # Research notes — sources and adaptations
 
+## Cập nhật thực nghiệm — 2026-11-06
+
+B1–B5 đã chạy, gồm full-data cleaning/stay/role diagnostics. Kết quả cập nhật ở
+[benchmark.md](../reports/cp1/benchmark.md); nguồn/phương pháp khóa ở
+[detector_protocol.md](../reports/cp1/detector_protocol.md) và
+[role_protocol.md](../reports/cp1/role_protocol.md). Không có lượt tìm paper hoặc tái tạo paper mới
+trong cập nhật này. Ghi chú A–D bên dưới là snapshot nguồn tham khảo ngày 2026-10-31, không phải
+trạng thái triển khai hiện tại; câu “chỉ subset” khi đó đã được các lượt full-data sau thay thế.
+
+Các adaptation đã kiểm bằng dữ liệu của dự án:
+
+- So fixed-anchor, median-updated, medoid-updated, max-neighbor-updated và ST-DBSCAN trên cùng
+  observations/cases. Cùng radius không có nghĩa cùng ràng buộc hình học; không gọi mọi bộ đã tối ưu.
+- ST-DBSCAN dùng neighborhood AND space/time; chuyển cluster thành min/max timestamp event có thể
+  nối cả hành trình. Case user 010 dài 9,06 giờ/888,6 km là bằng chứng local, không quy kết mọi
+  biến thể ST-DBSCAN hoặc kết quả paper. 9 bộ tham số chỉ khảo sát tổng hợp; 8 bộ phụ chưa chạy real.
+- Người dùng chọn fixed-anchor 150 m/10 phút để tiếp tục vì trade-off đã đọc; không phải thông số
+  chuyển giao từ paper hoặc winner đã vượt cổng B4. Baseline 100 m/core 0.2.0 được giữ nguyên.
+- Score và rule số ngày/dwell được so riêng ở B5 trên cả 100/150 m; score giữ ít predictions hơn,
+  ít đổi nơi trên nhóm cùng predicted khi dịch giờ, nhưng vẫn có predicted↔unknown và không có
+  nhãn độc lập để xác nhận tốt hơn. Không dùng output model làm nhãn.
+- B2 source groups/seeds tách selection/final, bootstrap theo exact-copy groups; GeoLife đã EDA
+  và không chứng minh mọi near-duplicate được phát hiện. Final chưa sinh/mở.
+
 Đọc/kiểm tra ngày 2026-10-31. Không tái tạo toàn bộ thuật toán hoặc kết quả của paper.
 
 ## A. GeoLife User Guide 1.3

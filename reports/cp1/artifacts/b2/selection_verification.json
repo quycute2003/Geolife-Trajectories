@@ -1,0 +1,21 @@
+{
+  "status": "verified",
+  "users": 81,
+  "cases": 28755,
+  "points": 36183328,
+  "truth_events": 29565,
+  "unobserved_events": 1209,
+  "pure_move_hours": 405.0,
+  "cases_by_group": {
+    "main": 14580,
+    "stress": 4860,
+    "dropout": 4860,
+    "unobservable": 405,
+    "two_stops": 2430,
+    "negative": 1620
+  },
+  "hashes": 162,
+  "elapsed_seconds": 1116.4470713000046,
+  "ram_mib": 145.5390625,
+  "final_corpus_exists": false
+}
