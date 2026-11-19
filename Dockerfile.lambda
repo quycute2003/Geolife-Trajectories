@@ -1,0 +1,24 @@
+FROM public.ecr.aws/lambda/python:3.12 AS base
+
+FROM base AS build
+COPY --from=ghcr.io/astral-sh/uv:0.12.16 /uv /usr/local/bin/uv
+WORKDIR /build
+COPY pyproject.toml uv.lock ./
+RUN uv export --locked --no-default-groups --group api --no-emit-project --output-file /tmp/geolife-requirements.txt \
+    && uv pip install --python /var/lang/bin/python3.12 --target /opt/geolife --only-binary :all: \
+       --require-hashes -r /tmp/geolife-requirements.txt \
+    && uv pip install --python /var/lang/bin/python3.12 --target /opt/geolife --only-binary :all: \
+       --no-deps "psycopg==3.3.0" "psycopg-binary==3.3.0"
+
+FROM base AS runtime
+COPY --from=build /opt/geolife/ ${LAMBDA_TASK_ROOT}/
+COPY src/ ${LAMBDA_TASK_ROOT}/
+COPY openapi.yaml ${LAMBDA_TASK_ROOT}/
+ENV PYTHONDONTWRITEBYTECODE=1
+CMD ["geolife_inference.lambda_handler.handler"]
+
+FROM runtime AS sqlite-demo
+COPY --from=demo_snapshot --chmod=0444 geolife.sqlite3 ${LAMBDA_TASK_ROOT}/geolife.sqlite3
+ENV GEOLIFE_SQLITE_PATH=${LAMBDA_TASK_ROOT}/geolife.sqlite3
+
+FROM runtime AS postgres

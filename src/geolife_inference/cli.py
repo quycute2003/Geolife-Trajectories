@@ -3,8 +3,9 @@ import argparse
 import logging
 from pathlib import Path
 
+from . import __version__
 from .clustering import MODEL_VERSIONS
-from .config import load_config
+from .config import CONFIG_PRESETS, load_config
 from .data import GeoLifeSource
 from .evaluation import describe_user, review_plot, write_json
 from .pipeline import run_pipeline
@@ -15,7 +16,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("command", choices=["inventory", "eda", "infer"])
     parser.add_argument("--dataset", type=Path, required=True, help="Local GeoLife ZIP or directory")
     parser.add_argument("--users", nargs="+", help="Optional explicit user IDs; default: every user in the dataset")
-    parser.add_argument("--config", type=Path)
+    config_args = parser.add_mutually_exclusive_group()
+    config_args.add_argument("--config", type=Path)
+    config_args.add_argument("--config-version", choices=CONFIG_PRESETS)
     parser.add_argument("--model", choices=MODEL_VERSIONS, default="dbscan-v1")
     parser.add_argument("--output", type=Path, default=Path("artifacts"))
     parser.add_argument("--plot", action="store_true", help="Write private offline PNG review plots")
@@ -25,7 +28,7 @@ def main(argv: list[str] | None = None) -> int:
     report = None
     try:
         source = GeoLifeSource(args.dataset)
-        config = load_config(args.config)
+        config = CONFIG_PRESETS[args.config_version] if args.config_version else load_config(args.config)
         if args.command == "inventory":
             write_json(args.output / "inventory.json", source.inventory())
             return 0
@@ -36,7 +39,8 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("One or more requested users do not exist")
         if args.command == "infer":
             report = {"status": "running", "scope": "full_dataset" if set(users) == set(source.by_user) else "selected_users",
-                      "model_version": args.model, "config": config.to_dict(), "expected_users": users,
+                      "model_version": args.model, "pipeline_version": __version__,
+                      "config": config.to_dict(), **config.version_metadata(), "expected_users": users,
                       "completed_users": [], "expected_trajectory_files": sum(len(source.by_user[u]) for u in users),
                       "processed_trajectory_files": 0, "input_points": 0, "output_points": 0}
             write_json(args.output / "run-audit.json", report)

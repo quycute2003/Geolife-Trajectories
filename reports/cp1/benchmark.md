@@ -227,7 +227,7 @@ hòa cả hai thì unknown; bỏ cổng score/share/margin, nên khác nhau cả
 | dbscan-v1 | 150 | Score | 39 | 143 | 22 | 160 |
 | dbscan-v1 | 150 | Đơn giản | 56 | 126 | 38 | 144 |
 
-![Tỷ lệ gán Home/Office, đủ 182 user](artifacts/b5/roles_v1/plots/01_ty_le_du_doan.png)
+![Tỷ lệ gán Home/Office, đủ 182 user](../../artifacts/benchmark/b5/roles_v1/plots/01_ty_le_du_doan.png)
 
 ### Đổi radius ít đổi nơi trên nhóm cùng predicted
 

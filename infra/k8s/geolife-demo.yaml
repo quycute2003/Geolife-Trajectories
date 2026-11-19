@@ -1,0 +1,118 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: geolife
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: geolife-blue
+  namespace: geolife
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: geolife-inference
+      track: blue
+  template:
+    metadata:
+      labels:
+        app: geolife-inference
+        track: blue
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: api
+          image: geolife-api:0.2.0-sqlite-demo
+          imagePullPolicy: Never
+          env:
+            - name: MODEL_VERSION
+              value: heuristic-v1
+          ports:
+            - name: http
+              containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            timeoutSeconds: 3
+            periodSeconds: 5
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+            seccompProfile:
+              type: RuntimeDefault
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: geolife-green
+  namespace: geolife
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: geolife-inference
+      track: green
+  template:
+    metadata:
+      labels:
+        app: geolife-inference
+        track: green
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: api
+          image: geolife-api:0.2.0-sqlite-demo
+          imagePullPolicy: Never
+          env:
+            - name: MODEL_VERSION
+              value: dbscan-v1
+          ports:
+            - name: http
+              containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            timeoutSeconds: 3
+            periodSeconds: 5
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+            seccompProfile:
+              type: RuntimeDefault
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: geolife-live
+  namespace: geolife
+spec:
+  selector:
+    app: geolife-inference
+    track: blue
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: geolife-preview
+  namespace: geolife
+spec:
+  selector:
+    app: geolife-inference
+    track: green
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http

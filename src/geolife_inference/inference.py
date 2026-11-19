@@ -1,4 +1,7 @@
 """Transparent evidence scoring and abstention, without ground-truth claims."""
+from functools import reduce
+from operator import add
+
 from .config import Config
 
 EVIDENCE_WEIGHTS = {"recurrence": .30, "duration": .25, "temporal_consistency": .20,
@@ -13,7 +16,7 @@ def role_candidates(locations: list[dict], coverage: dict, config: Config, role:
     dwell_key = "night_dwell_minutes" if role == "home" else "weekday_daytime_dwell_minutes"
     days_key = "night_visit_days" if role == "home" else "weekday_daytime_visit_days"
     observed_days = coverage["night_observed_days" if role == "home" else "work_observed_days"]
-    total = sum(loc[dwell_key] for loc in locations)
+    total = reduce(add, (loc[dwell_key] for loc in locations), 0)
     ranked = []
     for loc in locations:
         dwell, days = loc[dwell_key], loc[days_key]
@@ -21,7 +24,7 @@ def role_candidates(locations: list[dict], coverage: dict, config: Config, role:
         components = {"recurrence": min(days / 5, 1.0), "duration": min(dwell / 600, 1.0),
                       "temporal_consistency": min(days / max(1, observed_days), 1.0),
                       "coverage": min(coverage["observed_minutes"] / 1440, 1.0), "relative_strength": share}
-        score = sum(components[k] * w for k, w in EVIDENCE_WEIGHTS.items())
+        score = reduce(add, (components[k] * w for k, w in EVIDENCE_WEIGHTS.items()), 0)
         eligible = (days >= config.min_role_days and dwell >= config.min_role_dwell_minutes
                     and (role == "home" or loc["weekday_daytime_weeks"] >= config.min_office_weeks))
         ranked.append({"cluster_id": loc["cluster_id"], "latitude": loc["latitude"], "longitude": loc["longitude"],

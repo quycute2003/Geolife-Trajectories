@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from math import fsum
 from zoneinfo import ZoneInfo
 from dataclasses import replace
 import pandas as pd
@@ -118,6 +119,20 @@ def test_ambiguous_home_abstains(make_points):
     assert result["home"]["status"] == "unknown"
     assert result["home"]["reason"] == "ambiguous_candidates"
     assert len(result["pois"]) >= 1
+
+
+def test_role_score_keeps_baseline_float_addition(monkeypatch):
+    monkeypatch.setattr("geolife_inference.inference.sum", fsum, raising=False)
+    locations = [
+        {"cluster_id": i, "latitude": 39.9, "longitude": 116.3,
+         "night_visit_days": 3, "night_dwell_minutes": dwell}
+        for i, dwell in enumerate((60.1, 70.2, 80.3))
+    ]
+    coverage = {"night_observed_days": 7, "observed_minutes": 750.0}
+    candidates = role_candidates(locations, coverage, Config(), "home")
+    candidate = next(item for item in candidates if item["cluster_id"] == 1)
+    assert candidate["relative_share"] == 0.3333333333333333
+    assert candidate["evidence_score"] == 0.406422619047619
 
 
 def test_multi_user_input_rejected(make_points):

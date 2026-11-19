@@ -60,7 +60,7 @@ def run_pipeline(points: pd.DataFrame, user_id: str, config: Config | None = Non
     identity = json.dumps([user_id, digest, config.to_dict(), model_version, __version__], sort_keys=True)
     result = {"inference_id": str(uuid5(NAMESPACE_URL, identity)), "user_id": user_id,
               "model_version": model_version, "pipeline_version": __version__, "status": "completed",
-              "timezone": config.timezone, "config": config.to_dict(),
+              "timezone": config.timezone, "config": config.to_dict(), **config.version_metadata(),
               "score_semantics": "Uncalibrated heuristic evidence score in [0,1]; not a probability.",
               **prediction, "locations": locations, "coverage": coverage,
               "diagnostics": {**audit, **stay_audit, "stay_events": len(grouped),

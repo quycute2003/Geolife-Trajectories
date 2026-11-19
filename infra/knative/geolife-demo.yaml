@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: geolife-knative
+---
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: geolife-inference
+  namespace: geolife-knative
+  labels:
+    networking.knative.dev/visibility: cluster-local
+  annotations:
+    networking.knative.dev/ingress-class: kourier.ingress.networking.knative.dev
+spec:
+  template:
+    metadata:
+      name: geolife-inference-blue
+      annotations:
+        autoscaling.knative.dev/min-scale: "0"
+    spec:
+      containerConcurrency: 1
+      containers:
+        - name: api
+          image: dev.local/geolife-api:0.2.0-sqlite-demo
+          imagePullPolicy: Never
+          env:
+            - name: MODEL_VERSION
+              value: heuristic-v1
+          ports:
+            - containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+  traffic:
+    - revisionName: geolife-inference-blue
+      tag: blue
+      percent: 100

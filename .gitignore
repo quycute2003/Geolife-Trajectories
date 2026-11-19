@@ -1,4 +1,6 @@
 .venv/
+.venv-mlflow/
+.venv-registry/
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -8,6 +10,8 @@ build/
 dist/
 data/
 artifacts/
+/mlflow.db
+/mlflow.db-*
 tmp/
 *.plt
 *.zip

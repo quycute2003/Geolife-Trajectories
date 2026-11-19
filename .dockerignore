@@ -1,0 +1,10 @@
+# Only send files used to build and run the API.
+**
+!pyproject.toml
+!uv.lock
+!openapi.yaml
+!src/
+src/*
+!src/geolife_inference/
+src/geolife_inference/*
+!src/geolife_inference/*.py

@@ -3,12 +3,13 @@
 Kế hoạch chính của dự án. Cập nhật checkbox và kết quả kiểm chứng sau từng phase.
 Ngày bắt đầu: 2026-10-31. Ngôn ngữ: Python 3.11+, dùng `py` trên Windows.
 
-**Ưu tiên hiện tại (2026-11-04): bổ sung benchmark CP1 trước CP2.** Baseline offline đã
-hoàn thành về triển khai; chưa chứng minh thuật toán/ngưỡng hiện tại là lựa chọn tốt nhất.
-Phần “Bổ sung CP1 — benchmark và lựa chọn có bằng chứng” bên dưới là kế hoạch đang theo.
-B1 đã bắt đầu bằng kiểm kê saved outputs và chuẩn bị NB06; chưa chạy scan GeoLife mới hoặc thay thuật toán.
+**Ưu tiên hiện tại (2026-11-17): chạy demo CP2 trên Kubernetes local với Knative Serving và Kourier.**
+Hai Revision dùng cùng snapshot SQLite chỉ đọc. Mốc tiếp theo là tạo cluster Docker Desktop,
+kiểm chứng API và scale-to-zero, rồi đo canary 90/10 và rollback trên cùng URL. Xem
+[kế hoạch CP2](docs/cp2-implementation-plan.md) và [hướng dẫn chạy](docs/cp2-knative-deploy.md).
+Kết quả benchmark CP1 đã được ghi trong [báo cáo](reports/cp1/benchmark.md).
 
-## Hướng làm hiện tại — notebook trước, đi từng bước
+## Cách làm notebook trong CP1
 
 **Cập nhật theo yêu cầu người dùng ngày 2026-10-31:** tiến độ triển khai vừa qua quá nhanh
 so với mục tiêu học và hiểu dữ liệu. Chuyển sang quy trình khám phá có giải thích, chart
@@ -21,7 +22,7 @@ cleaning rules hay kết quả suy luận là đã chốt. Bắt đầu lại b�
 ### Cách làm việc
 
 - **Quy tắc phạm vi mới nhất:** mọi phân tích/xử lý từ đây mặc định chạy toàn bộ dataset. Không tự giới hạn 1–3 users hoặc lấy mẫu points. Có thể xử lý theo từng trajectory/user để tiết kiệm RAM nhưng phải bao phủ đủ tất cả rồi tổng hợp. Các kết quả subset trước đây chỉ là lịch sử.
-- **Lượt cập nhật hiện tại (2026-11-03):** người dùng đã chạy CLI 0.2.0 DBSCAN đủ 182 users / 18.670 files; saved outputs khớp NB02–05 trong float tolerance. Đã tạo worksheet review 32 dòng/8 trường hợp và báo cáo CP1; OpenAPI đã validate 188 examples/responses để người dùng trình bày trực tiếp. Heuristic CLI mới chưa chạy lại; chưa triển khai HTTP API.
+- **Mốc 2026-11-03:** người dùng đã chạy CLI 0.2.0 DBSCAN đủ 182 users / 18.670 files; saved outputs khớp NB02–05 trong float tolerance. Đã tạo worksheet review 32 dòng/8 trường hợp và báo cáo CP1; OpenAPI đã validate 188 examples/responses để người dùng trình bày trực tiếp. Tại mốc này, heuristic CLI mới chưa chạy lại và HTTP API chưa được triển khai.
 - Mỗi notebook chia cell ngắn: mục đích → code → bảng/chart → nhận xét. Theo yêu cầu mới nhất, không có phần quiz/tự kiểm tra hoặc yêu cầu người dùng điền câu trả lời.
 - Giải thích ý nghĩa của chart, đơn vị, mẫu số và phạm vi dữ liệu đang xem.
 - Phân biệt dữ liệu raw/parsed với dữ liệu sau cleaning; không dùng output đã làm sạch làm raw baseline.
@@ -49,7 +50,7 @@ chỉ có đáp án thật trong thế giới tổng hợp đã sinh; không suy
 
 **Mục tiêu trước CP2:** so detector/ngưỡng bằng đáp án tổng hợp; đo độ nhạy trên dữ liệu thật;
 audit cleaning; kiểm tra phủ định bằng nhãn phương tiện và ổn định Home/Office.
-Giữ baseline khi bằng chứng chưa phân biệt được lựa chọn. Chưa triển khai HTTP/Docker/AWS.
+Giữ baseline khi bằng chứng chưa phân biệt được lựa chọn. Phạm vi mục này là benchmark offline của CP1.
 
 ### Phạm vi, tiến độ giữ nguyên và sản phẩm
 
@@ -483,8 +484,8 @@ không ổn định; **không tuyên bố accuracy Home/Office** khi chưa có �
   pháp mới, lưu dữ liệu tổng hợp và kết quả thật riêng; không ghi đè artifacts baseline hoặc tự push/deploy.
   Ghi mọi mục chưa chạy và compute đã dùng; không tick bằng dự toán.
 
-**Tiêu chí xong:** báo cáo tái lập, đủ giới hạn và decision table; người dùng quyết định phiên bản
-đưa vào service. CP2 chỉ dự kiến khi dependency/job thực sự hoàn tất.
+**Tiêu chí xong của B6** là báo cáo tái lập, bảng quyết định và giới hạn, cùng phiên bản
+được chọn để đưa vào service.
 
 ### Thứ tự phụ thuộc
 
@@ -500,9 +501,8 @@ không ổn định; **không tuyên bố accuracy Home/Office** khi chưa có �
 - **B5:** dùng detector/config được giữ hoặc xác nhận ở B4 để kiểm tra Home/Office, unknown và timezone.
 - **B6:** tổng hợp outputs B1–B5, decision table, giới hạn và các job/phép đo chưa hoàn tất.
 
-**CP2 chỉ bắt đầu khi dependency/job thực sự hoàn tất, không cam kết ngày.** Người dùng chủ động
-chạy tuần tự các job khi code/input/protocol sẵn sàng; tổng compute vẫn trong 24 giờ, không cấp lại
-ngân sách theo bước hoặc chế độ. Không tự tạo automation/khởi job hoặc tăng grid để giữ tiến độ.
+Trong CP1, người dùng chạy tuần tự các job khi code, input và protocol sẵn sàng. Trần compute
+24 giờ áp dụng cho toàn bộ benchmark CP1. Tiến độ CP2 được theo dõi ở mục Tuần 3–4.
 
 ### Mở rộng không chặn CP2
 
@@ -567,36 +567,48 @@ gọi một nơi là Home/Office, và khi nào nên trả unknown? API contract 
 **Điều kiện chuyển bước:** phân biệt point/stay/visit/cluster, giải thích unknown và score;
 nếu muốn mở rộng sang HTTP service thì chốt phạm vi ở checkpoint riêng.
 
-### Tuần 3 — API, đóng gói và model versioning (CP2, chưa triển khai)
+### Tuần 3 — API, đóng gói và model versioning (CP2, đang triển khai)
 
 **Câu hỏi cốt lõi:** thuật toán offline khác một service ở đâu? Model version gồm thuật toán,
 config và code gì? Làm sao gửi lại cùng input và biết bản nào tạo ra output?
 
-- [ ] Nếu cần HTTP service: làm một request nhỏ → validation → core → response, quan sát lỗi input cụ thể.
-- [ ] So contract examples với API thực tế; bổ sung HTTP tests sau khi có implementation.
-- [ ] Đóng gói chạy local, giải thích Docker image/container, config, dependencies và resource limits.
-- [ ] So sánh `heuristic-v1` và `dbscan-v1` trên cùng sample/config/evaluation procedure;
-  ghi version metadata, artifact provenance và khác biệt output.
+- [x] API local: request → validation → core → response, với lỗi input có đường dẫn cụ thể.
+- [x] Kiểm tra OpenAPI, luồng HTTP và kết quả CLI đã lưu.
+- [x] Ghi định danh thuật toán gom cụm, phiên bản core và cấu hình thực chạy trong API/CLI.
+- [x] Đóng gói và chạy Docker local. Đã kiểm chứng API v2 nhận `user_id` với PostgreSQL local và
+  SQLite chỉ đọc. Hai bản HTTP với SQLite cho user `101` đều khớp JSON CLI.
+- [x] So sánh `heuristic-v1` và `dbscan-v1` trên toàn bộ 182 user với `baseline-v1`.
+  [Kết quả ghép cặp, metadata và tiêu chí release](reports/cp2/release.md)
 - [ ] Chuẩn bị presentation tuần 3 trong `reports/week3/`, tập trung câu hỏi, bằng chứng, điều chưa chắc.
 
 **Sản phẩm:** service local theo contract, hai model versions tái lập được, presentation tuần 3.
-**Điều kiện chuyển bước:** người dùng giải thích được data flow, version và cách reproduce/rollback;
-không tự dựng registry phức tạp khi metadata đơn giản còn đủ cho bài học.
+Hai model dùng cùng `baseline-v1`. Việc chạy thử trên cluster và đăng ký model được theo dõi ở Tuần 4.
 
-### Tuần 4 — Triển khai AWS và chiến lược release (CP2, chưa triển khai)
+### Tuần 4 — Kubernetes local, Knative và chiến lược release (CP2, đang triển khai)
 
-**Câu hỏi cốt lõi:** request đi qua đâu trên AWS? Chi phí phát sinh từ đâu? Vì sao chọn cách deploy
-này, và khi model mới có vấn đề thì quay lại bản cũ bằng cách nào?
+**Câu hỏi cốt lõi** là request đi qua đâu, Revision khởi động lại thế nào sau khi về 0 pod, và
+cách giữ cùng URL khi chia traffic hoặc quay lại Blue.
 
-- [ ] Vẽ kiến trúc nhỏ; so các lựa chọn compute/storage theo nhu cầu và chi phí ước tính có nguồn lúc làm.
-- [ ] Chuẩn bị deployment plan cụ thể, permissions, tài nguyên, ngân sách và cleanup/rollback plan
-  để người dùng duyệt **trước** khi tạo cloud resources hoặc phát sinh chi phí.
-- [ ] Sau khi được phép: deploy service có endpoint kiểm chứng được, xác minh version đang chạy.
-- [ ] Giải thích Shadow, Canary, Blue-green bằng sơ đồ/request routing; chọn và demo ít nhất một chiến lược.
-- [ ] Ghi log thực nghiệm release/rollback, thay đổi version, ảnh hưởng và giới hạn của demo.
+- [x] Chuẩn bị Dockerfile HTTP cho SQLite, manifest Knative Service và script stage, canary,
+  promote, rollback. 126 test đã pass. Logic đổi route đã kiểm tra bằng mô phỏng.
+- [ ] Tạo cluster Docker Desktop, cài Knative Serving + Kourier và deploy hai Revision.
+  Kiểm tra riêng Blue và Green qua HTTP, gồm `/version` và đối chiếu JSON CLI cho user `101`.
+- [ ] Quan sát pod về 0 khi rảnh, gọi API để quan sát cold start và đo latency đầu cuối.
+- [ ] Chạy canary **90% Blue / 10% Green** trên URL live, ghi số request, lỗi và p95 theo
+  `model_version`. Diễn tập promote **100% Green** và rollback **100% Blue** trên cùng URL.
+- [ ] Đăng ký hai phiên bản trong MLflow Model Registry local và liên kết với Revision, Git commit,
+  image, cấu hình, snapshot và kết quả kiểm tra. Registry chưa được dựng.
+- [ ] Bàn giao sơ đồ, endpoint local, số đo, log và giới hạn demo. Giải thích Shadow, Canary
+  và Blue-green. Canary và rollback là các bước chạy thực nghiệm.
 
-**Sản phẩm:** accessible AWS service, release strategy demo, version/rollback evidence và cost notes.
-**Điều kiện chuyển bước:** hiểu đường đi request, cách kiểm tra version và rollback, có endpoint đã xác minh.
+**Sản phẩm** gồm endpoint local đã xác minh, hai bản model truy vết được, bằng chứng scale-to-zero,
+canary và rollback. Xem [các bước CP2](docs/cp2-implementation-plan.md).
+
+Sau khi bản local chạy ổn, nếu cần endpoint cho người khác truy cập, chọn môi trường từ xa,
+triển khai bản đã kiểm chứng và kiểm tra lại endpoint tại đó.
+
+**Giao diện demo sản phẩm.** Làm web đặt xe với gợi ý Nhà/Công ty/POI và thử A/B hai model dựa
+trên việc khách xác nhận chuyến bằng gợi ý. Xem [plan giao diện đặt xe](docs/ride-booking-ui-plan.md).
 
 ### Tuần 5 — Serving và đo latency/error (CP3, chưa triển khai)
 

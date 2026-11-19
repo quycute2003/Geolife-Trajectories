@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#f6faf9">
+  <title>Đặt xe · GeoLife</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
+  <script src="fixtures.js" defer></script>
+  <script src="map.js" defer></script>
+  <script src="booking.js" defer></script>
+</head>
+<body>
+  <svg class="icon-library" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="i-logo" viewBox="0 0 24 24"><path d="M20 10c0 5-8 10-8 10S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3"/><path d="M5 20v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7m-7 7h14"/></symbol>
+    <symbol id="i-pickup" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 5 5"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7M5 9.5V20h14V9.5M10 20v-6h4v6"/></symbol>
+    <symbol id="i-office" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M3 12a19 19 0 0 0 18 0m-9 1v2"/></symbol>
+    <symbol id="i-poi" viewBox="0 0 24 24"><path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1.1 6.1-5.5-2.9-5.5 2.9 1.1-6.1-4.4-4.3 6.1-.9L12 3Z"/></symbol>
+    <symbol id="i-map" viewBox="0 0 24 24"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3V6Zm6-3v15m6-12v15"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M19 10c0 4.5-7 10-7 10s-7-5.5-7-10a7 7 0 1 1 14 0Z"/><circle cx="12" cy="10" r="2"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="1.5"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  </svg>
+
+  <main class="app" aria-label="Đặt xe GeoLife">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark"><svg class="icon"><use href="#i-logo"/></svg></span>
+        <span>GeoLife</span>
+      </div>
+      <button id="open-profiles" class="profile-button pill" type="button" hidden>
+        <svg class="icon"><use href="#i-user"/></svg><span id="active-profile"></span><svg class="icon caret"><use href="#i-down"/></svg>
+      </button>
+    </header>
+
+    <section id="profile-page" class="profile-page" aria-labelledby="profiles-title">
+      <div class="profile-panel">
+        <h1 id="profiles-title" tabindex="-1">Chọn người dùng</h1>
+        <label id="profile-filter" class="search-pill" hidden>
+          <svg class="icon"><use href="#i-search"/></svg>
+          <input id="profile-search" type="search" inputmode="numeric" autocomplete="off" placeholder="Tìm theo mã người dùng" aria-label="Tìm theo mã người dùng">
+        </label>
+        <p id="profile-status" class="hint" role="status" hidden></p>
+        <ul id="profile-list" class="place-list profile-list" aria-label="Người dùng GeoLife"></ul>
+        <button id="reload-profiles" class="pill primary" type="button" hidden>Thử lại</button>
+        <button id="return-booking" class="pill map-button" type="button" hidden>Quay lại chuyến đi</button>
+      </div>
+    </section>
+
+    <div id="booking-stage" class="stage" hidden>
+      <div id="map" class="map" role="group" aria-label="Bản đồ chuyến đi mô phỏng">
+        <canvas id="map-canvas" aria-hidden="true"></canvas>
+        <div id="map-pickup" class="map-marker pickup-marker" hidden>
+          <span class="marker-caption">Điểm đón</span><span class="marker-pin"><svg class="icon"><use href="#i-pickup"/></svg></span>
+        </div>
+        <div id="map-destination" class="map-marker destination-marker" hidden>
+          <span class="marker-caption" id="destination-caption">Điểm đến</span><span class="marker-pin"><svg class="icon"><use href="#i-pin"/></svg></span>
+        </div>
+      </div>
+
+      <div id="map-tools" class="map-tools" role="group" aria-label="Điều khiển bản đồ">
+        <div class="zoom-controls">
+          <button class="icon-button" type="button" id="zoom-in" aria-label="Phóng to bản đồ"><svg class="icon"><use href="#i-plus"/></svg></button>
+          <button class="icon-button" type="button" id="zoom-out" aria-label="Thu nhỏ bản đồ"><svg class="icon"><use href="#i-minus"/></svg></button>
+        </div>
+        <button class="icon-button locate-button" type="button" id="center-map" aria-label="Căn giữa bản đồ"><svg class="icon"><use href="#i-target"/></svg></button>
+      </div>
+
+      <div class="map-key">
+        <span class="map-key-status"><svg class="icon"><use href="#i-map"/></svg> <span id="map-key-label" role="status">Bản đồ mô phỏng</span></span>
+        <a id="map-attribution" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" hidden>© OpenStreetMap contributors</a>
+      </div>
+
+      <section id="sheet" class="sheet" aria-labelledby="sheet-title">
+        <button id="sheet-handle" class="sheet-handle" type="button" aria-expanded="false" aria-label="Mở rộng bảng đặt xe" aria-controls="sheet-content"><span></span></button>
+        <div id="sheet-content" class="sheet-content">
+          <div class="sheet-header">
+            <button id="back" class="icon-button back-button" aria-label="Quay lại" type="button" hidden><svg class="icon"><use href="#i-back"/></svg></button>
+            <h1 id="sheet-title" tabindex="-1">Bạn muốn đi đâu?</h1>
+          </div>
+
+          <div id="choose-view" class="view">
+            <button id="edit-pickup" class="pickup-row" type="button">
+              <span class="pickup-dot"><svg class="icon"><use href="#i-pickup"/></svg></span>
+              <span class="row-text"><span class="row-label">Điểm đón</span><span id="current-pickup" class="current-pickup clamp"></span></span>
+              <svg class="icon trailing"><use href="#i-chevron"/></svg>
+            </button>
+          </div>
+
+          <div id="search-view" class="view" hidden>
+            <label class="search-pill" for="place-search">
+              <svg class="icon"><use href="#i-search"/></svg>
+              <input id="place-search" type="search" aria-label="Tìm địa chỉ hoặc địa điểm" placeholder="Tìm địa chỉ hoặc địa điểm" autocomplete="off" enterkeyhint="search" spellcheck="false">
+            </label>
+            <p id="suggestion-status" class="hint suggestion-status" role="status" hidden></p>
+            <div id="suggestions" class="place-section" hidden>
+              <h2>Điểm đến gợi ý</h2>
+              <ul id="suggestion-list" class="place-list"></ul>
+            </div>
+            <div id="search-results" class="place-section" hidden>
+              <h2>Địa điểm mẫu</h2>
+              <ul id="result-list" class="place-list"></ul>
+              <p id="no-results" class="hint" role="status" hidden>Không tìm thấy địa điểm mẫu. Bạn có thể chọn trên bản đồ.</p>
+            </div>
+            <button id="choose-map" class="pill map-button" type="button"><svg class="icon"><use href="#i-map"/></svg> Chọn trên bản đồ</button>
+          </div>
+
+          <div id="review-view" class="view" hidden>
+            <div class="trip-card">
+              <button id="review-pickup" class="trip-row" type="button">
+                <span class="trip-marker pickup-trip"><svg class="icon"><use href="#i-pickup"/></svg></span>
+                <span class="row-text"><span class="row-label">Điểm đón</span><span id="review-pickup-name" class="trip-name clamp"></span><span id="review-pickup-address" class="address clamp"></span></span>
+                <span class="edit-label" aria-hidden="true">Sửa</span>
+              </button>
+              <button id="review-destination" class="trip-row" type="button">
+                <span class="trip-marker destination-trip"><svg class="icon"><use href="#i-pin"/></svg></span>
+                <span class="row-text"><span class="row-label">Điểm đến</span><span id="review-destination-name" class="trip-name clamp"></span><span id="review-destination-address" class="address clamp"></span></span>
+                <span class="edit-label" aria-hidden="true">Sửa</span>
+              </button>
+            </div>
+          </div>
+
+          <div id="map-view" class="view" hidden>
+            <p class="hint map-instructions">Chạm hoặc kéo ghim trên bản đồ để đổi vị trí. Bạn cũng có thể dùng các phím mũi tên.</p>
+          </div>
+
+          <div id="success-view" class="view" hidden>
+            <div class="success-mark" aria-hidden="true">
+              <svg class="icon"><use href="#i-check"/></svg><i></i><i></i><i></i><i></i><i></i><i></i>
+            </div>
+            <p class="hint success-text">Chuyến đi đến <strong id="success-destination"></strong> đã được xác nhận trong bản demo.</p>
+          </div>
+          <details id="release-details" class="release-details" hidden>
+            <summary>Phiên bản gợi ý</summary>
+            <p id="serving-details" class="hint"></p>
+            <p id="registry-details" class="hint" role="status"></p>
+          </details>
+        </div>
+
+        <div id="sheet-footer" class="sheet-footer" hidden>
+          <button id="confirm" type="button" class="pill primary"></button>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <template id="place-template">
+    <li>
+      <button type="button" class="place-card">
+        <span class="place-icon"><svg class="icon"><use/></svg></span>
+        <span class="row-text"><span class="place-name clamp"></span><span class="address clamp"></span></span>
+        <svg class="icon trailing"><use href="#i-chevron"/></svg>
+      </button>
+    </li>
+  </template>
+</body>
+</html>

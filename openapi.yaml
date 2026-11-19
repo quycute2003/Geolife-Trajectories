@@ -3,29 +3,66 @@ info:
   title: Home / Office / Recurring Location Inference
   version: 0.2.0-draft
   description: |
-    CP1 API design proposal for direct presentation. No HTTP implementation exists.
+    Draft production contract with a loopback-only CP2 implementation for local verification.
     Synchronous inference for one user's GPS history; POI means recurring location,
     not a business category. Scores are uncalibrated heuristic evidence, not probabilities.
     Unknown roles are successful completed inferences (200), including empty inputs.
-    Proposed limits: 100000 points, 20 MiB decoded JSON body, 20000 stay events,
-    60-second processing deadline; these are proposed service limits and require load tests before implementation.
+    The local server limits on-demand inference to 100000 points and request bodies to 20 MiB.
+    A 20000-stay limit and 60-second deadline are proposed production limits pending load tests.
     UTC input is required. Behavioral timezone is explicit and never inferred from coordinates.
-    No dataset paths, URLs, cross-user requests or server-side file access are accepted.
+    Requests do not accept dataset paths, URLs, or cross-user input.
     Production must use HTTPS, authentication, authorization for user_id, request size limits,
     no coordinate logging, no shared response caching, and no persistence by default.
-    Deployment and enforcement belong to later approved API work.
+    The bearer authentication, rate limits and processing limits below describe production behavior.
+    The local server accepts requests without credentials on 127.0.0.1.
 tags:
   - name: locations
 security:
   - bearerAuth: []
 paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Check whether the API can respond to HTTP requests
+      security: []
+      responses:
+        '200':
+          description: API is responding
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [status]
+                properties:
+                  status: {type: string, const: ok}
+  /version:
+    get:
+      operationId: getVersion
+      summary: Identify the pipeline and default model and configuration served by this instance
+      description: Defaults apply when the inference request omits model and configuration overrides.
+      security: []
+      responses:
+        '200':
+          description: Serving defaults and configuration fingerprint
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [model_version, pipeline_version, config_version, config_sha256]
+                properties:
+                  model_version: {$ref: '#/components/schemas/ModelVersion'}
+                  pipeline_version: {type: string}
+                  config_version: {type: string}
+                  config_sha256: {$ref: '#/components/schemas/InferenceResponse/properties/config_sha256'}
   /v1/locations/infer:
     post:
       tags: [locations]
       operationId: inferLocationsV1
       summary: Infer likely Home, Office and recurring locations for one user
       description: |
-        Proposal only. Point ordering is normalized per trajectory. Each trajectory_id
+        Point ordering is normalized per trajectory. Each trajectory_id
         identifies a recording boundary; it must not be reused for unrelated recordings.
         Equal timestamp/coordinate duplicates are deduplicated. Equal-timestamp conflicts
         use spatial_vote_context_v2: mean nearby fixes, prefer the largest pairwise-close
@@ -47,8 +84,7 @@ paths:
                 value:
                   user_id: synthetic-user
                   model_version: dbscan-v1
-                  config:
-                    timezone: Asia/Shanghai
+                  config_version: baseline-v1
                   points:
                     - {trajectory_id: t1, latitude: 39.9, longitude: 116.3, timestamp: '2024-01-01T00:00:00Z'}
                     - {trajectory_id: t1, latitude: 39.9, longitude: 116.3, timestamp: '2024-01-01T00:05:00Z'}
@@ -75,6 +111,8 @@ paths:
                     user_id: synthetic-user
                     model_version: dbscan-v1
                     pipeline_version: 0.2.0
+                    config_version: baseline-v1
+                    config_sha256: a1e6ce4aac7398df9df9f66d768fcafee50cea241f94bc48654e4717ea5dc6ea
                     status: completed
                     timezone: Asia/Shanghai
                     config:
@@ -148,6 +186,8 @@ paths:
                     user_id: synthetic-user
                     model_version: dbscan-v1
                     pipeline_version: 0.2.0
+                    config_version: baseline-v1
+                    config_sha256: a1e6ce4aac7398df9df9f66d768fcafee50cea241f94bc48654e4717ea5dc6ea
                     status: completed
                     timezone: Asia/Shanghai
                     config:
@@ -320,6 +360,67 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/ErrorResponse'}
+  /v2/locations/infer:
+    post:
+      tags: [locations]
+      operationId: inferLocationsV2
+      summary: Infer locations from a user's stored GPS history
+      description: |
+        Uses the user's full GPS history from the configured GeoLife snapshot.
+        The full snapshot can serve a precomputed result for a history above the on-demand
+        limit. The result matches the configured model, pipeline version, and baseline config.
+        The local pilot uses dbscan-v1 and baseline-v1. User IDs are three-digit strings
+        with leading zeroes preserved. Unknown roles are valid successful results.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/HistoryInferenceRequest'}
+            example: {user_id: '101'}
+      responses:
+        '200':
+          description: Inference completed using the indicated snapshot
+          headers:
+            Cache-Control:
+              schema: {type: string, const: no-store}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/HistoryInferenceResponse'}
+        '400':
+          description: Malformed JSON or invalid content length
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
+        '404':
+          description: The configured snapshot has no GPS history for the requested user
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
+        '413':
+          description: Request body exceeds 20 MiB
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
+        '415':
+          description: Expected uncompressed application/json
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
+        '422':
+          description: Invalid request or history exceeds the on-demand limit with no matching precomputed result
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
+        '500':
+          description: Inference failed
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
+        '503':
+          description: Stored GPS history is unavailable
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
 components:
   securitySchemes:
     bearerAuth:
@@ -327,6 +428,16 @@ components:
       scheme: bearer
       description: Proposed bearer authentication; caller authorization must constrain user_id
   schemas:
+    HistoryInferenceRequest:
+      type: object
+      additionalProperties: false
+      required: [user_id]
+      properties:
+        user_id: {type: string, minLength: 3, maxLength: 3, pattern: '^[0-9]{3}$'}
+    HistoryInferenceResponse:
+      allOf:
+        - {$ref: '#/components/schemas/InferenceResponse'}
+        - required: [config_version, config_sha256, data_snapshot_id]
     UTCDateTime:
       type: string
       format: date-time
@@ -341,6 +452,12 @@ components:
     Nonnegative: {type: number, minimum: 0}
     Count: {type: integer, minimum: 0}
     ModelVersion: {type: string, enum: [heuristic-v1, dbscan-v1], default: dbscan-v1}
+    ConfigPreset:
+      type: string
+      enum: [baseline-v1, stay150-experiment-v1]
+      description: |
+        baseline-v1 uses a 100 m stay radius and a 10 minute minimum duration.
+        stay150-experiment-v1 changes only the stay radius to 150 m.
     Config:
       type: object
       additionalProperties: false
@@ -379,7 +496,7 @@ components:
       additionalProperties: false
       required: [trajectory_id, latitude, longitude, timestamp]
       properties:
-        trajectory_id: {type: string, minLength: 1, maxLength: 128}
+        trajectory_id: {type: string, minLength: 1, maxLength: 128, pattern: '.*\S.*'}
         latitude: {$ref: '#/components/schemas/Latitude'}
         longitude: {$ref: '#/components/schemas/Longitude'}
         timestamp: {$ref: '#/components/schemas/UTCDateTime'}
@@ -390,9 +507,13 @@ components:
       type: object
       additionalProperties: false
       required: [user_id, points]
+      not: {required: [config, config_version]}
       properties:
         user_id: {type: string, minLength: 1, maxLength: 64, pattern: '.*\S.*'}
         model_version: {$ref: '#/components/schemas/ModelVersion'}
+        config_version:
+          $ref: '#/components/schemas/ConfigPreset'
+          description: Select a preset instead of config. Omitting both uses baseline-v1.
         config: {$ref: '#/components/schemas/Config'}
         points:
           type: array
@@ -541,12 +662,29 @@ components:
     InferenceResponse:
       type: object
       additionalProperties: false
+      description: New results include both config identity fields. Legacy saved results may omit both.
+      dependentRequired:
+        config_version: [config_sha256]
+        config_sha256: [config_version]
       required: [inference_id, user_id, model_version, pipeline_version, status, timezone, config, score_semantics, home, office, pois, locations, coverage, diagnostics, warnings]
       properties:
         inference_id: {type: string, format: uuid, description: Deterministic UUID for normalized input/model/config; not an authentication token}
         user_id: {type: string}
         model_version: {$ref: '#/components/schemas/ModelVersion'}
         pipeline_version: {type: string, enum: [0.1.0, 0.2.0], description: 0.1.0 is legacy tie-break; 0.2.0 uses NB02 spatial/context voting}
+        config_version:
+          type: string
+          enum: [baseline-v1, stay150-experiment-v1, custom]
+          description: Preset matching the full effective configuration, or custom if none matches.
+        config_sha256:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+          description: SHA-256 of the effective configuration encoded as sorted compact UTF-8 JSON with normalized numeric values.
+        data_snapshot_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: GeoLife snapshot used for inference from stored GPS history.
         status: {type: string, const: completed}
         timezone: {type: string}
         config:
@@ -584,7 +722,7 @@ components:
           properties:
             code:
               type: string
-              enum: [malformed_payload, validation_error, unauthenticated, forbidden, payload_too_large, unsupported_media_type, rate_limited, internal_error, resource_exhausted]
+              enum: [malformed_payload, validation_error, unauthenticated, forbidden, payload_too_large, unsupported_media_type, rate_limited, internal_error, resource_exhausted, user_not_found, history_too_large, history_unavailable]
             message: {type: string, maxLength: 500}
             details:
               type: array

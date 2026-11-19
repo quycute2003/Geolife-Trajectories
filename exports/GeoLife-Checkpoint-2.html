@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GeoLife · Checkpoint 2</title>
+  <style>
+    :root {
+      --teal-500: #14B8A6;
+      --teal-700: #0F766E;
+      --teal-100: #E6F7F5;
+      --coral-500: #FF6B5B;
+      --bg: #F6FAF9;
+      --surface: #FFFFFF;
+      --text: #1F2A37;
+      --text-muted: #5B6770;
+      --border: #E3EAEA;
+      --shadow: 0 12px 32px rgba(15, 118, 110, .12);
+      --scale: 1;
+      --progress: 0%;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 400 32px/1.42 "Be Vietnam Pro", system-ui, "Segoe UI", Arial, sans-serif;
+    }
+    h1, h2, h3, p, ul { margin: 0; }
+    h1, h2, h3 { line-height: 1.2; }
+    h1 { font-size: 88px; }
+    h2 { font-size: 52px; max-width: 1600px; text-wrap: balance; }
+    h3 { font-size: 34px; }
+    small { font-size: 28px; }
+    code { font-family: Consolas, "Courier New", monospace; }
+    main {
+      position: fixed;
+      inset: 50% auto auto 50%;
+      width: 1920px;
+      height: 1080px;
+      transform: translate(-50%, -50%) scale(var(--scale));
+    }
+    .slide {
+      position: absolute;
+      inset: 0;
+      display: none;
+      grid-template-rows: auto 1fr;
+      gap: 40px;
+      overflow: hidden;
+      padding: 80px 96px 104px;
+      background: var(--bg);
+    }
+    .slide.current { display: grid; }
+    .slide.current > :not(.notes) { animation: reveal 300ms ease-out both; }
+    @keyframes reveal { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    .eyebrow { margin-bottom: 16px; color: var(--teal-700); font-size: 24px; font-weight: 700; }
+    .cover, .closing { grid-template-rows: 1fr; background: var(--teal-700); color: var(--surface); text-align: center; }
+    .cover .eyebrow, .closing .eyebrow { color: var(--teal-100); }
+    .hero { align-self: center; justify-self: center; max-width: 1504px; }
+    .hero h1 ~ p { margin-top: 24px; color: var(--teal-100); }
+    .hero-icon { display: grid; place-items: center; width: 112px; height: 112px; margin: 0 auto 32px; background: var(--teal-100); color: var(--teal-700); border-radius: 32px; }
+    .hero-icon svg { width: 58px; height: 58px; }
+    .cover::before, .closing::before, .cover::after, .closing::after {
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+      content: "";
+      opacity: .32;
+    }
+    .cover::before, .closing::before { inset: -200px -120px auto auto; width: 600px; height: 600px; border: 3px solid var(--teal-500); }
+    .cover::after, .closing::after { inset: auto auto -280px -160px; width: 560px; height: 560px; border: 3px solid var(--teal-500); }
+    .message, .two-col, .steps { display: grid; gap: 32px; align-content: center; min-height: 0; }
+    .message { grid-template-columns: 5fr 7fr; align-items: center; gap: 64px; }
+    .two-col { grid-template-columns: repeat(2,minmax(0,1fr)); }
+
+    .steps { grid-template-columns: repeat(4,minmax(0,1fr)); }
+    .card, .board, .table-wrap { border: 1px solid var(--border); border-radius: 32px; background: var(--surface); box-shadow: var(--shadow); }
+    .card, .board { padding: 40px; }
+    .card > .tag + h3, .node > .tag + strong { margin-top: 16px; }
+    .card p:not(:first-child) { margin-top: 16px; }
+    .card ul { padding-left: 36px; margin-top: 24px; }
+    .card li + li { margin-top: 16px; }
+    .board { display: grid; align-content: center; gap: 24px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 24px; }
+    .tag { display: inline-block; width: max-content; max-width: 100%; border-radius: 999px; padding: 8px 24px; color: var(--teal-700); background: var(--teal-100); font-size: 28px; font-weight: 500; }
+    .tag.accent { background: var(--coral-500); color: var(--text); }
+
+    .table-wrap { align-self: center; overflow: hidden; }
+    table { width: 100%; border-spacing: 0; text-align: left; font-size: 30px; }
+    th, td { padding: 20px 28px; }
+    thead { background: var(--teal-100); }
+    th { color: var(--teal-700); }
+    tr + tr td { border-top: 1px solid var(--border); }
+
+    .mono-block { font-size: 30px; padding: 24px; background: var(--teal-100); border-radius: 20px; }
+    .node { padding: 24px 32px; border: 1px solid var(--border); background: var(--bg); border-radius: 20px; }
+    .node strong, .node small { display: block; }
+    .node small { color: var(--text-muted); }
+    .steps .card { min-height: 270px; position: relative; padding: 32px; }
+    .steps .card:not(:last-child)::after { position: absolute; top: 46%; right: -30px; content: "→"; font-size: 32px; color: var(--teal-700); }
+    .weight { display: block; margin: 16px 0 8px; color: var(--teal-700); font-size: 48px; line-height: 1.25; white-space: nowrap; }
+    .diagram { align-self: center; width: 100%; height: 100%; min-height: 0; max-height: 736px; }
+    .diagram .box { fill: var(--surface); stroke: var(--border); stroke-width: 2; }
+    .diagram .boundary { fill: var(--teal-100); stroke: var(--border); stroke-width: 2; }
+    .diagram .primary { fill: var(--teal-100); stroke: var(--teal-700); }
+    .diagram text { fill: var(--text); font-size: 32px; font-weight: 700; }
+    .diagram .detail { fill: var(--text-muted); font-size: 26px; font-weight: 400; }
+    .diagram .scope { fill: var(--teal-700); font-size: 28px; }
+    .diagram .arrow { fill: none; stroke: var(--teal-700); stroke-width: 3; marker-end: url(#arrow); }
+    .diagram .configuration { stroke-dasharray: 8 7; }
+
+    .notes { display: none; }
+    main.notes-open .current .notes {
+      position: absolute;
+      inset: auto 96px 104px;
+      z-index: 3;
+      display: block;
+      padding: 32px 40px;
+      border: 2px solid var(--teal-700);
+      border-radius: 32px;
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: var(--shadow);
+      font-size: 24px;
+      text-align: left;
+    }
+    .controls { position: absolute; right: 96px; bottom: 28px; z-index: 4; display: flex; align-items: center; gap: 16px; }
+    .controls button, .counter { min-width: 48px; padding: 8px 16px; border: 1px solid var(--border); border-radius: 999px; color: var(--teal-700); background: var(--surface); font-size: 22px; font-weight: 700; line-height: 1.2; }
+    .controls button { cursor: pointer; font-family: inherit; }
+    .controls button:focus-visible { outline: 4px solid var(--teal-500); }
+    .controls button:disabled { opacity: .62; cursor: default; }
+    .progress { position: absolute; inset: auto 0 0; z-index: 4; height: 6px; background: var(--border); }
+    .progress::after { display: block; width: var(--progress); height: 100%; background: var(--teal-500); content: ""; }
+    @media (prefers-reduced-motion: reduce) { .slide.current > :not(.notes) { animation: none; } }
+    @page { size: 20in 11.25in; margin: 0; }
+    @media print {
+      body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      main { position: static; width: auto; height: auto; transform: none; }
+      .slide, .slide.current { position: relative; display: grid; width: 1920px; height: 1080px; break-after: page; }
+      .slide:last-of-type { break-after: auto; }
+      .slide.current > :not(.notes) { animation: none; }
+      .controls, .progress, main.notes-open .current .notes { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main aria-label="Báo cáo Checkpoint 2 GeoLife">
+    <section class="slide cover" aria-labelledby="title-1">
+      <div class="hero">
+        <div class="hero-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.5-8 10-8 10S4 14.5 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg>
+        </div>
+        <p class="eyebrow">GeoLife · Checkpoint 2</p>
+        <h1 id="title-1">Từ lịch sử GPS<br>đến gợi ý điểm đến</h1>
+        <p>API suy luận, quản lý phiên bản và triển khai trên Kubernetes</p>
+        <p>Phạm Xuân Quý · 19/11/2026</p>
+      </div>
+      <aside class="notes">CP1 xây pipeline tìm địa điểm thường đến. CP2 đưa pipeline vào một dịch vụ HTTP, đăng ký phiên bản và diễn tập chuyển phiên bản trong khi client giữ nguyên URL.</aside>
+    </section>
+
+    <section class="slide" aria-labelledby="title-2">
+      <header><p class="eyebrow">Bài toán</p><h2 id="title-2">Lịch sử GPS giúp gợi ý điểm đến khi đặt xe</h2></header>
+      <div class="message">
+        <div><p>Gợi ý hiện khi khách mở màn hình chọn điểm đến.</p><div class="tags"><span class="tag">Nhà</span><span class="tag">Công ty</span><span class="tag">Nơi hay đến</span></div></div>
+        <div class="board"><div class="node"><strong>GPS theo thời gian</strong><small>Phát hiện điểm dừng</small></div><div class="node"><strong>Địa điểm thường đến</strong><small>Gom cụm các điểm dừng</small></div><div class="node"><strong>Gợi ý khi đặt xe</strong><small>Suy luận từ thói quen ghé thăm</small></div></div>
+      </div>
+      <aside class="notes">Một ứng viên Nhà có thể là nơi được ghé nhiều vào buổi tối. Cả hai phiên bản trả unknown khi bằng chứng chưa đủ. Giao diện đặt xe là bối cảnh ứng dụng, chưa có số liệu sử dụng gợi ý từ người dùng thật.</aside>
+    </section>
+
+    <section class="slide" aria-labelledby="title-3">
+      <header><p class="eyebrow">Lựa chọn triển khai</p><h2 id="title-3">Kubernetes giữ được luồng phục vụ đã thiết kế trên AWS</h2></header>
+      <div class="table-wrap"><table><thead><tr><th scope="col">Chức năng</th><th scope="col">Thiết kế AWS</th><th scope="col">Bản local</th></tr></thead><tbody>
+        <tr><td>Chạy API</td><td>AWS Lambda</td><td>Kubernetes + Knative Serving</td></tr>
+        <tr><td>Nhận HTTP</td><td>API Gateway</td><td>Kourier</td></tr>
+        <tr><td>Chia traffic và rollback</td><td>Lambda versions / alias</td><td>Knative Revision / Route</td></tr>
+        <tr><td>Phân phối image</td><td>Amazon ECR</td><td>Kho image Docker Desktop</td></tr>
+        <tr><td>Lưu GPS</td><td>Amazon RDS for PostgreSQL</td><td>PostgreSQL local</td></tr>
+      </tbody></table></div>
+      <aside class="notes">Image Lambda đã được thử trong emulator và đẩy lên ECR. Tạo Lambda trên AWS gặp HTTP 403. Nhóm chuyển sang Docker Desktop để tiếp tục triển khai và thử luồng. Manifest YAML, kubectl và script rollout quản lý triển khai. Nhà cung cấp Kubernetes cloud chưa chốt.</aside>
+    </section>
+
+    <section class="slide" aria-labelledby="title-4">
+      <header><p class="eyebrow">Phục vụ API trên Kubernetes</p><h2 id="title-4">Knative Serving và Kourier là gì?</h2></header>
+      <div class="two-col">
+        <article class="card">
+          <h3>Knative Serving</h3>
+          <p>Công cụ chạy và quản lý dịch vụ web trên Kubernetes.</p>
+          <ul><li>Tăng giảm số pod theo lượng request, có thể về 0 khi rảnh.</li><li>Giữ hai phiên bản và đặt tỷ lệ chia request.</li></ul>
+        </article>
+        <article class="card">
+          <h3>Kourier</h3>
+          <p>Cổng nhận request HTTP cho dịch vụ chạy bằng Knative.</p>
+          <ul><li>Nhận request từ app đặt xe qua một URL.</li><li>Chuyển request vào Blue hoặc Green theo tỷ lệ đã đặt.</li></ul>
+        </article>
+      </div>
+      <aside class="notes">Kubernetes chạy pod chứa API. Knative gọi mỗi phiên bản triển khai là một Revision. Route giữ URL và tỷ lệ gửi request vào từng Revision. Kourier dùng Envoy để nhận và chuyển request theo Route. Khi một Revision đang có 0 pod, Knative khởi động pod khi có request. Demo local truy cập Kourier bằng kubectl port-forward.</aside>
+    </section>
+
+    <section class="slide" aria-labelledby="title-5">
+      <header><p class="eyebrow">Kiến trúc demo</p><h2 id="title-5">Một API gợi ý, hai phiên bản dùng chung PostgreSQL</h2></header>
+      <svg class="diagram" viewBox="0 0 1728 736" role="img" aria-labelledby="arch-title arch-desc">
+        <title id="arch-title">Kiến trúc API GeoLife trên Kubernetes</title>
+        <desc id="arch-desc">Ứng dụng đặt xe gửi user_id qua Kourier. Trong Kubernetes, Knative Route đặt tỷ lệ chia request vào Blue hoặc Green. Cả hai đọc lịch sử GPS hoặc kết quả đã tính từ PostgreSQL. Khi phát hành, script đăng ký hai phiên bản vào MLflow Model Registry.</desc>
+        <defs><marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4" orient="auto"><path d="M0 0L8 4 0 8" fill="none" stroke="#0F766E" stroke-width="1.2"/></marker></defs>
+
+        <rect class="boundary" x="364" y="24" width="924" height="501" rx="32"/>
+        <text class="scope" x="406" y="69">Kubernetes · Docker Desktop</text>
+
+        <path class="arrow" d="M324 304H406"/>
+        <path class="arrow" d="M406 352H324"/>
+        <path class="arrow configuration" d="M553 194V261"/>
+        <path class="arrow" d="M722 291H782Q806 291 806 267V194Q806 177 823 177H864"/>
+        <path class="arrow" d="M722 337H782Q806 337 806 361V393Q806 410 823 410H864"/>
+        <path class="arrow" d="M1218 177H1272Q1300 177 1300 205V259Q1300 277 1318 277H1352"/>
+        <path class="arrow" d="M1218 410H1272Q1300 410 1300 386V366Q1300 348 1318 348H1352"/>
+
+        <rect class="box" x="4" y="223" width="320" height="191" rx="28"/>
+        <text x="28" y="272">Ứng dụng đặt xe</text>
+        <text class="detail" x="28" y="311">POST /v2/locations/infer</text>
+        <text class="detail" x="28" y="349">Gửi <tspan font-family="monospace">user_id</tspan></text>
+        <text class="detail" x="28" y="388">Nhận Nhà, Công ty, POI</text>
+
+        <rect class="box" x="406" y="96" width="316" height="98" rx="22"/>
+        <text x="432" y="138">Knative Route</text>
+        <text class="detail" x="432" y="173">URL và tỷ lệ chia</text>
+        <text class="detail" x="573" y="237">Cấu hình</text>
+
+        <rect class="box primary" x="406" y="261" width="316" height="109" rx="24"/>
+        <text x="432" y="305">Kourier</text>
+        <text class="detail" x="432" y="341">Nhận và chuyển HTTP</text>
+
+        <rect class="box" x="864" y="111" width="354" height="131" rx="24"/>
+        <text x="892" y="161">Blue Revision</text>
+        <text class="detail" x="892" y="202">API · heuristic-v1</text>
+
+        <rect class="box" x="864" y="345" width="354" height="131" rx="24"/>
+        <text x="892" y="395">Green Revision</text>
+        <text class="detail" x="892" y="436">API · dbscan-v1</text>
+        <text class="detail" x="864" y="510">Kết nối DB qua Secret</text>
+
+        <rect class="box primary" x="1352" y="213" width="372" height="199" rx="28"/>
+        <text x="1382" y="265">PostgreSQL</text>
+        <text class="detail" x="1382" y="307">Lịch sử GPS</text>
+        <text class="detail" x="1382" y="342">Kết quả đã tính trước</text>
+        <text class="detail" x="1382" y="377">Snapshot đầy đủ</text>
+        <text class="detail" x="1294" y="322">Đọc</text>
+
+        <rect class="boundary" x="4" y="560" width="1720" height="154" rx="32"/>
+        <text class="scope" x="40" y="623">Quản lý phiên bản</text>
+        <text class="detail" x="40" y="661">Khi phát hành</text>
+        <rect class="box" x="406" y="584" width="345" height="106" rx="24"/>
+        <text x="432" y="648">Script đăng ký</text>
+        <path class="arrow" d="M751 637H864"/>
+        <rect class="box" x="864" y="584" width="816" height="106" rx="24"/>
+        <text x="892" y="629">MLflow Model Registry</text>
+        <text class="detail" x="892" y="665">geolife-home-office · Version 1 heuristic · Version 2 DBSCAN</text>
+      </svg>
+      <aside class="notes">App gửi user_id qua Kourier và nhận lại Nhà, Công ty, POI cùng phiên bản model. Nét đứt biểu thị Knative Route cung cấp cấu hình định tuyến cho Kourier. Blue và Green dùng cùng image API và cấu hình baseline-v1. Cả hai đọc snapshot geolife-1.3-full-v1 từ PostgreSQL qua Kubernetes Secret. Script đăng ký lưu hai gói thuật toán vào MLflow để đối chiếu khi phát hành. Gói MLflow hiện dùng snapshot SQLite demo. Request API chạy bằng image đã triển khai.</aside>
+    </section>
+
+    <section class="slide" aria-labelledby="title-6">
+      <header><p class="eyebrow">Luồng API</p><h2 id="title-6">API dùng GPS trực tiếp khi lịch sử có tối đa 100.000 điểm</h2></header>
+      <div class="message">
+        <div class="board"><h3>POST /v2/locations/infer</h3><p class="mono-block"><code>{"user_id":"101"}</code></p><p>Trả Nhà, Công ty, POI cùng phiên bản model và snapshot.</p></div>
+        <div class="board"><div class="node"><span class="tag">128 người dùng</span><strong>Tối đa 100.000 điểm</strong><small>Đọc GPS từ PostgreSQL rồi suy luận theo request.</small></div><div class="node"><span class="tag">54 người dùng</span><strong>Trên 100.000 điểm</strong><small>Đọc kết quả đã tính từ GPS đầy đủ theo model và snapshot.</small></div></div>
+      </div>
+      <aside class="notes">User 101 có 13.738 điểm nên suy luận theo request. User 153 có 2.156.994 điểm nên dùng kết quả tính trước. Response có model_version, pipeline_version, config_version, config_sha256 và data_snapshot_id. Vai trò thiếu bằng chứng có trạng thái unknown. Bản tính trước dành cho lịch sử dài và được tạo từ toàn bộ GPS cho từng model. Nếu lịch sử vượt giới hạn thiếu kết quả tính trước, API trả history_too_large.</aside>
+    </section>
+
+    <section class="slide" aria-labelledby="title-7">
+      <header><p class="eyebrow">MLflow Model Registry</p><h2 id="title-7">MLflow lưu hồ sơ của hai phiên bản thuật toán</h2></header>
+      <div class="two-col">
+        <article class="card"><span class="tag">Version 1 · Blue</span><h3>heuristic-v1</h3><p>Gom cụm theo bán kính quanh điểm neo.</p></article>
+        <article class="card"><span class="tag">Version 2 · Green</span><h3>dbscan-v1</h3><p>Gom cụm theo mật độ và đánh dấu nhiễu.</p></article>
+      </div>
+      <aside class="notes">Mở hai alias heuristic-v1 và dbscan-v1 trong MLflow local. Hai gói đã đăng ký và được tải lại để đối chiếu CLI. Hồ sơ đăng ký hiện tại thuộc lượt đóng gói SQLite. Bản rollout PostgreSQL chạy image HTTP riêng, dùng model và snapshot ghi trong API. MLflow phục vụ truy vết, còn Knative Route điều khiển traffic.</aside>
+    </section>
+
+    <section class="slide" aria-labelledby="title-8">
+      <header><p class="eyebrow">Tỷ lệ request Blue / Green</p><h2 id="title-8">Blue/Green giữ bản cũ, canary cho Green nhận thử 10% traffic</h2></header>
+      <div class="steps">
+        <article class="card"><h3>Preview</h3><strong class="weight">100% / 0%</strong><small>Test Green qua URL riêng.</small></article>
+        <article class="card"><span class="tag accent">Canary</span><strong class="weight">90% / 10%</strong><small>Đo tỉ lệ, lỗi và latency.</small></article>
+        <article class="card"><h3>Promote</h3><strong class="weight">0% / 100%</strong><small>Green nhận toàn bộ traffic.</small></article>
+        <article class="card"><h3>Rollback</h3><strong class="weight">100% / 0%</strong><small>Đưa traffic về Blue.</small></article>
+      </div>
+      <aside class="notes">Các tỷ lệ trên slide theo thứ tự Blue / Green trên cùng URL live. Blue/Green giữ hai Revision sẵn để kiểm tra hoặc chuyển về. Canary giới hạn phần traffic chuyển sang Green trước promote. Tỉ lệ quan sát dao động quanh trọng số. Các bước promote và rollback trong CP2 do người vận hành chạy.</aside>
+    </section>
+
+    <section class="slide" aria-labelledby="title-9">
+      <header><p class="eyebrow">Bước tiếp theo</p><h2 id="title-9">Bước tiếp theo là đưa API lên cloud và đo lượt dùng gợi ý</h2></header>
+      <div class="two-col">
+        <article class="card"><span class="tag">Triển khai</span><h3>Kubernetes cloud</h3><ul><li>Đẩy image vào registry riêng.</li><li>Cấp PostgreSQL và endpoint HTTPS có xác thực.</li></ul></article>
+        <article class="card"><span class="tag">Sản phẩm</span><h3>A/B trên giao diện đặt xe</h3><ul><li>Cân bằng hồ sơ và nhiệm vụ giữa hai nhóm.</li><li>Đo tỷ lệ phiên xác nhận bằng gợi ý.</li></ul></article>
+      </div>
+      <aside class="notes">Canary dùng để theo dõi phát hành, còn A/B giữ nhóm theo người thử để đo hành vi. Chỉ tính phiên xác nhận bằng gợi ý khi người thử giữ nguyên điểm đến. Mẫu số chính là các phiên mở bước chọn điểm đến. Đo thêm tỉ lệ dùng gợi ý trong các phiên đã xác nhận và loại fixture khỏi số liệu người thử.</aside>
+    </section>
+
+    <section class="slide closing" aria-labelledby="title-10">
+      <div class="hero">
+        <div class="hero-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5a8.5 8.5 0 1 1 3.5 6.9L3 20l1.6-3.5A8.5 8.5 0 0 1 3 11.5Z"/><path d="M9 10a3 3 0 1 1 4.5 2.6c-1 .6-1.5 1-1.5 1.9m0 2h.01"/></svg></div>
+        <p class="eyebrow">GeoLife · Checkpoint 2</p><h1 id="title-10">Một URL.<br>Hai phiên bản đã kiểm chứng.</h1><p>Cảm ơn anh đã theo dõi. Mình cùng xem demo và trao đổi.</p>
+      </div>
+      <aside class="notes">Khi chạy demo trực tiếp, bắt đầu ở Blue 100% và mở preview Green. Trình diễn promote rồi rollback qua cùng một URL nếu thời gian có hạn. Số liệu canary đến từ lượt diễn tập 100 request.</aside>
+    </section>
+
+    <nav class="controls" aria-label="Điều khiển trình chiếu">
+      <button type="button" id="previous" aria-label="Slide trước">←</button>
+      <output class="counter" id="counter" aria-live="polite"></output>
+      <button type="button" id="next" aria-label="Slide sau">→</button>
+    </nav>
+    <div class="progress" aria-hidden="true"></div>
+  </main>
+  <script>
+    const frame = document.querySelector('main');
+    const slides = Array.from(document.querySelectorAll('.slide'));
+    const previous = document.querySelector('#previous');
+    const next = document.querySelector('#next');
+    const counter = document.querySelector('#counter');
+    let current = 0;
+
+    function fit() {
+      frame.style.setProperty('--scale', Math.min(window.innerWidth / 1920, window.innerHeight / 1080));
+    }
+
+    function show(index) {
+      current = Math.min(slides.length - 1, Math.max(0, index));
+      slides.forEach((slide, position) => {
+        slide.classList.toggle('current', position === current);
+        slide.querySelector('.notes').setAttribute('aria-hidden', String(!frame.classList.contains('notes-open')));
+      });
+      previous.disabled = current === 0;
+      next.disabled = current === slides.length - 1;
+      counter.textContent = `${current + 1} / ${slides.length}`;
+      frame.style.setProperty('--progress', `${(current + 1) / slides.length * 100}%`);
+      if (location.hash !== `#${current + 1}`) history.replaceState(null, '', `#${current + 1}`);
+    }
+
+    function restore() {
+      const number = Number(location.hash.slice(1));
+      show(Number.isInteger(number) ? number - 1 : 0);
+    }
+
+    const actions = {
+      ArrowLeft: () => show(current - 1), PageUp: () => show(current - 1),
+      ArrowRight: () => show(current + 1), PageDown: () => show(current + 1), ' ': () => show(current + 1),
+      Home: () => show(0), End: () => show(slides.length - 1),
+      f: () => {
+        const change = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
+        change?.catch(() => {});
+      },
+      n: () => {
+        frame.classList.toggle('notes-open');
+        show(current);
+      }
+    };
+
+    window.addEventListener('keydown', event => {
+      if (event.altKey || event.ctrlKey || event.metaKey || (event.key === ' ' && event.target instanceof HTMLButtonElement)) return;
+      const action = actions[event.key] || actions[event.key.toLowerCase()];
+      if (typeof action !== 'function') return;
+      event.preventDefault();
+      action();
+    });
+    frame.addEventListener('click', event => {
+      if (event.target.closest('.controls, .notes') || getSelection()?.toString()) return;
+      show(current + (event.clientX < window.innerWidth / 2 ? -1 : 1));
+    });
+    previous.addEventListener('click', () => show(current - 1));
+    next.addEventListener('click', () => show(current + 1));
+    window.addEventListener('resize', fit);
+    window.addEventListener('hashchange', restore);
+    fit();
+    restore();
+  </script>
+</body>
+</html>

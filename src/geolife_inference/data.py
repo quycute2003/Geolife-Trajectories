@@ -41,12 +41,14 @@ def iter_cleaned_timelines(path: str | Path, chunksize: int = 100_000) -> Iterat
         yield carry
 
 
-def parse_plt(stream: TextIO, user_id: str, trajectory_id: str) -> pd.DataFrame:
+def parse_plt(stream: TextIO, user_id: str, trajectory_id: str, *,
+              include_source_row: bool = False) -> pd.DataFrame:
     """Malformed field counts are rejected; invalid values remain visible for audit."""
     try:
         frame = pd.read_csv(stream, skiprows=6, header=None, dtype=str, keep_default_na=False)
     except pd.errors.EmptyDataError:
-        return pd.DataFrame(columns=POINT_COLUMNS)
+        columns = [*POINT_COLUMNS, "source_row"] if include_source_row else POINT_COLUMNS
+        return pd.DataFrame(columns=columns)
     if frame.shape[1] != 7 or frame.isna().any().any():
         raise ValueError("PLT records must contain exactly 7 fields")
     frame.columns = ["latitude", "longitude", "unused", "altitude", "serial_day", "date", "time"]
@@ -59,6 +61,8 @@ def parse_plt(stream: TextIO, user_id: str, trajectory_id: str) -> pd.DataFrame:
         "timestamp": pd.to_datetime(frame.date + " " + frame.time,
                                     format="%Y-%m-%d %H:%M:%S", errors="coerce", utc=True),
     })
+    if include_source_row:
+        result["source_row"] = result.index + 1
     return result.sort_values("timestamp", kind="stable", na_position="last").reset_index(drop=True)
 
 
@@ -94,7 +98,7 @@ class GeoLifeSource:
         else:
             yield None
 
-    def trajectories(self, user_id: str) -> Iterator[pd.DataFrame]:
+    def trajectories(self, user_id: str, *, include_source_row: bool = False) -> Iterator[pd.DataFrame]:
         if user_id not in self.by_user:
             raise ValueError(f"Unknown user_id: {user_id}")
         with self._archive() as archive:
@@ -102,11 +106,12 @@ class GeoLifeSource:
                 trajectory_id = PurePosixPath(name).stem
                 if archive is not None:
                     with archive.open(name) as raw, io.TextIOWrapper(raw, encoding="utf-8-sig") as stream:
-                        yield parse_plt(stream, user_id, trajectory_id)
+                        yield parse_plt(stream, user_id, trajectory_id, include_source_row=include_source_row)
                 else:
                     with (self.path / name).open(encoding="utf-8-sig") as stream:
-                        yield parse_plt(stream, user_id, trajectory_id)
+                        yield parse_plt(stream, user_id, trajectory_id, include_source_row=include_source_row)
 
-    def load_user(self, user_id: str) -> pd.DataFrame:
-        return pd.concat(list(self.trajectories(user_id)), ignore_index=True).sort_values(
+    def load_user(self, user_id: str, *, include_source_row: bool = False) -> pd.DataFrame:
+        return pd.concat(list(self.trajectories(user_id, include_source_row=include_source_row)),
+                         ignore_index=True).sort_values(
             ["timestamp", "trajectory_id"], kind="stable").reset_index(drop=True)

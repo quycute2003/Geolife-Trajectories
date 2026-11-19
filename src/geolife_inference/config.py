@@ -1,5 +1,7 @@
 """Validated, serializable baseline assumptions; no machine-specific paths."""
-from dataclasses import asdict, dataclass, fields
+from dataclasses import asdict, dataclass, fields, replace
+import hashlib
+import json
 import math
 from pathlib import Path
 import tomllib
@@ -57,10 +59,29 @@ class Config:
     def to_dict(self) -> dict:
         return asdict(self)
 
+    def version_metadata(self) -> dict[str, str]:
+        values = self.to_dict()
+        # JSON integers and floats represent the same value for number fields.
+        for field in fields(self):
+            if field.type is float:
+                value = float(values[field.name])
+                values[field.name] = 0.0 if value == 0 else value
+        encoded = json.dumps(values, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+        version = next((name for name, preset in CONFIG_PRESETS.items() if self == preset), "custom")
+        return {"config_version": version, "config_sha256": hashlib.sha256(encoded).hexdigest()}
+
+
+BASELINE_CONFIG_VERSION = "baseline-v1"
+_BASELINE = Config()
+CONFIG_PRESETS = {
+    BASELINE_CONFIG_VERSION: _BASELINE,
+    "stay150-experiment-v1": replace(_BASELINE, distance_m=150.0),
+}
+
 
 def load_config(path: str | Path | None = None) -> Config:
     if path is None:
-        return Config()
+        return _BASELINE
     with Path(path).open("rb") as stream:
         values = tomllib.load(stream)
     unknown = set(values) - {f.name for f in fields(Config)}

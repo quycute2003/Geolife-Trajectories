@@ -1,0 +1,2 @@
+data:
+  registries-skipping-tag-resolving: kind.local,ko.local,dev.local

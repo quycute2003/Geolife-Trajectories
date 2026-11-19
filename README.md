@@ -1,132 +1,170 @@
-# GeoLife Home / Office / POI Inference — CP1
+# GeoLife Home / Office / POI Inference
 
-Baseline Python chạy offline, từ GPS đến stay events và các địa điểm thường ghé.
-Home/Office là **ứng viên theo hành vi**, có thể `unknown`; POI không phải business category.
-Không có ground truth Home/Office, evidence score không phải xác suất.
+Dự án dùng dữ liệu GPS GeoLife để suy luận vị trí có thể là nhà, nơi làm việc
+và các địa điểm thường ghé (POI).
 
-Kế hoạch và trạng thái: [PLAN.md](PLAN.md). Kết quả thực nghiệm: [reports/cp1/results.md](reports/cp1/results.md).
-**OpenAPI là bản thiết kế trong CP1 để người dùng trình bày trực tiếp. Repository không chứa HTTP server hoặc cloud infrastructure.**
+## Pipeline
 
-## Bắt đầu học từ notebook
+`GPS thô → làm sạch → phát hiện lần dừng → gom địa điểm → suy luận theo thời gian`
 
-Hiện tại đi lại theo hướng hiểu dữ liệu trước. Bản pipeline phía dưới là bản thử tham khảo,
-không thay thế việc đọc chart và thảo luận quyết định. Kế hoạch học đủ sáu tuần ở `PLAN.md`.
+Hai model dùng chung bước làm sạch, phát hiện lần dừng và suy luận vai trò.
+`heuristic-v1` gom các lần dừng theo bán kính quanh điểm neo cố định.
+`dbscan-v1` gom theo mật độ bằng DBSCAN với khoảng cách Haversine.
+Pipeline có giao diện CLI và API kiểm thử local. [Kiến trúc](docs/architecture.md) · [OpenAPI](openapi.yaml)
 
-- Khám phá dữ liệu: [01_dataset_overview.ipynb](notebooks/01_dataset_overview.ipynb).
-- Preprocessing toàn dataset và so trước–sau: [02_preprocessing.ipynb](notebooks/02_preprocessing.ipynb); đã chạy đủ 182 users / 18.670 trajectories.
-- Tìm lần dừng trên cleaned dataset: [03_stay_detection.ipynb](notebooks/03_stay_detection.ipynb); đã chạy đủ input, baseline 10.339 stays của 151/182 users, có sensitivity toàn dataset.
-- Gom các lần dừng thành địa điểm: [04_location_grouping.ipynb](notebooks/04_location_grouping.ipynb); đã chạy toàn stays. Phần 7b có map tương tác hai phương pháp, chọn mọi user, zoom và popup; mở riêng `artifacts/locations/03_location_map.html` nếu cần.
-- Suy luận Home/Office/POI: [05_role_inference.ipynb](notebooks/05_role_inference.ipynb); người dùng đã chạy toàn dataset và sensitivity, có giải thích score/unknown, chart và map nhãn.
-- NB02 scan phân phối timestamp conflict trước; đặt ngưỡng ở phần 5 rồi gộp mean nhóm gần, cách ly nhóm xa có truy vết. Không tự đoán ngưỡng.
-- Mỗi bài chỉ có một notebook. Kết quả xuất vào thư mục tương ứng trong `artifacts/`.
-- [Hướng dẫn mở notebook, đọc theo từng buổi và các câu hỏi cần hiểu](notebooks/README.md).
-- Notebook 01 là EDA ban đầu có phần subset. Từ notebook 02, mọi xử lý mới mặc định toàn dataset; NB03–05 lần lượt tìm stays, gom địa điểm và suy luận vai trò.
+## Phiên bản suy luận
 
-## Setup trên Windows / PowerShell
+| Trường | Ý nghĩa |
+|---|---|
+| `model_version` | Cách gom cụm, `dbscan-v1` (mặc định) hoặc `heuristic-v1`. |
+| `pipeline_version` | Phiên bản core thực thi các bước suy luận, hiện là `0.2.0`. |
+| `config_version` | Bộ tham số khớp với cấu hình thực chạy. `baseline-v1` dùng bán kính lần dừng 100 m và tối thiểu 10 phút. `stay150-experiment-v1` chỉ tăng bán kính lần dừng lên 150 m. Các cấu hình khác mang tên `custom`. |
+| `config_sha256` | Dấu vân tay của toàn bộ cấu hình thực chạy. Response và `run-audit.json` cũng ghi đầy đủ các tham số trong `config`. |
 
-Yêu cầu: Python 3.11–3.13 qua `py`, Git, và `uv` (đã có trong môi trường phát triển).
-Các lệnh dưới đây chạy từ thư mục gốc repository:
+Trong request v1, dùng `"config_version": "stay150-experiment-v1"` để thử 150 m hoặc dùng
+`config` để gửi tham số riêng. Nếu bỏ cả hai, API dùng `baseline-v1`. Để quay về 100 m,
+gửi lại cùng GPS và `model_version` với `"config_version": "baseline-v1"`.
+CLI chọn cùng preset bằng `--config-version stay150-experiment-v1`. Đặt `--output` riêng cho
+mỗi lần chạy để giữ kết quả đối chiếu. Khi tái lập cấu hình `custom`, dùng các giá trị trong
+`config` của kết quả đã lưu.
+
+## Chạy API bằng Docker
+
+Khởi động Docker Desktop ở chế độ Linux containers. Từ PowerShell ở gốc repo, build image và chạy container:
 
 ```powershell
-uv sync --frozen --group notebook --python (py -c "import sys; print(sys.executable)")
-# Chọn môi trường riêng cho py, không cần thay đổi PowerShell execution policy.
+docker build -t geolife-api:0.2.0-cp2 .
+docker run --rm --name geolife-api-local --cpus 2 --memory 2g -p 127.0.0.1:8001:8000 geolife-api:0.2.0-cp2
+```
+
+Dockerfile cài các thư viện API theo `uv.lock`. API lắng nghe cổng `8000` trong container.
+Mapping `127.0.0.1:8001:8000` cho phép máy local gọi `http://127.0.0.1:8001/v1/locations/infer`.
+Image chứa code và OpenAPI. Dữ liệu GPS và kết quả CLI nằm trên máy để phục vụ đối chiếu.
+
+Khi container báo API đã lắng nghe, mở PowerShell thứ hai ở gốc repo và chạy kiểm tra:
+
+```powershell
 $env:VIRTUAL_ENV = (Resolve-Path .venv).Path
-py -X utf8 -c "import sys; print(sys.executable)"
-py -X utf8 -m pytest -q
+py -X utf8 scripts/check_local_api.py --port 8001
 ```
 
-`py` phải trỏ tới `.venv\Scripts\python.exe` sau khi đặt `VIRTUAL_ENV`.
-`uv.lock` khóa cả phụ thuộc trực tiếp và gián tiếp. Không dùng môi trường Python chung cho dự án.
+Script đối chiếu user 101 với JSON CLI đã lưu, thử hai preset trên cùng ba điểm GPS tổng hợp,
+và kiểm tra lỗi `422` khi thiếu `latitude`. Dừng container bằng `Ctrl+C` ở cửa sổ đang chạy.
 
-## Dataset và chạy thử
+## Thử API với PostgreSQL local
 
-Dataset đã giải nén tại `data/Geolife Trajectories 1.3/`. Mở notebook trực tiếp không cần biến môi trường.
-Core CLI vẫn có thể dùng GeoLife ZIP hoặc thư mục qua `--dataset`;
-không có đường dẫn máy cá nhân hardcode trong mã nguồn. Loader cũng nhận thư mục
-chứa cấu trúc `<user_id>/Trajectory/*.plt`, hoặc thư mục cha của cấu trúc đó.
-Dataset local được giải nén từ ZIP do người dùng cung cấp, không tải lại từ mạng.
+Dùng một database PostgreSQL local dành cho GeoLife. Từ PowerShell ở gốc repo, đặt
+`GEOLIFE_POSTGRES_DSN` theo kết nối thực tế. Ví dụ dưới đây dùng PostgreSQL trên cổng `55432`.
 
 ```powershell
-$dataset = Join-Path (Get-Location) 'data\Geolife Trajectories 1.3'
-py -X utf8 -m geolife_inference inventory --dataset $dataset
-py -X utf8 -m geolife_inference eda --dataset $dataset --output artifacts/eda-full
-py -X utf8 -m geolife_inference infer --dataset $dataset --model dbscan-v1 --config configs/baseline.toml --output artifacts/pipeline/dbscan-v1 --audit-points
-py -X utf8 -m geolife_inference infer --dataset $dataset --model heuristic-v1 --config configs/baseline.toml --output artifacts/pipeline/heuristic-v1 --audit-points
+$env:VIRTUAL_ENV = (Resolve-Path .venv).Path
+$env:GEOLIFE_POSTGRES_DSN = 'host=127.0.0.1 port=55432 dbname=postgres user=geolife'
+uv pip install --python .venv/Scripts/python.exe 'psycopg[binary]==3.3.0'
+py -X utf8 scripts/import_postgres.py --user-id 101
+py -X utf8 -m geolife_inference.api
 ```
 
-Hai lệnh infer trên là hai lựa chọn model, mỗi lệnh mặc định xử lý **mọi user**, không phải chỉ ba users.
-Không cần chạy notebook trước: loader → preprocessing voting → stays → grouping → temporal evidence → JSON.
-Core 0.2.0 đã dùng cùng policy `spatial_vote_context_v2` với NB02, ngưỡng gộp 20 m trong config,
-giữ observation segments khi conflict không giải quyết được. `--users` chỉ giới hạn khi bạn chủ động truyền vào.
-CLI đọc một user trong RAM mỗi lần; không khẳng định streaming trong một user rất lớn.
-
-Mỗi user có `<user>-<model>.json` và `-stays.csv`. Cờ `--audit-points` thêm `-removed.csv`
-(invalid/exact duplicates) và `-conflicts.csv` (mọi distinct conflict fixes, mean contributors và điểm tách riêng).
-Không xuất bản cleaned GPS thứ hai mặc định. `run-audit.json` trong thư mục output ghi phạm vi,
-users/files dự kiến và đã xử lý, counts và running/failed/completed; không coi lượt thất bại là full completed.
-Chọn thư mục output riêng cho mỗi model/lượt chạy để không lẫn kết quả cũ.
-
-Python cũng có một hàm duy nhất để gọi toàn bộ pipeline:
-
-```python
-from geolife_inference.config import Config
-from geolife_inference.pipeline import run_pipeline
-
-run = run_pipeline(points, user_id="003", config=Config(), model_version="dbscan-v1")
-result = run.result
-```
-
-`points` là DataFrame GPS thô của đúng user đó, gồm user_id/trajectory_id/latitude/longitude/altitude_m/timestamp.
-Timestamp phải UTC có timezone; altitude missing dùng NaN. `run.points`, `run.stays`,
-`run.removed_points`, `run.conflict_points` giúp kiểm tra các bước. Không truyền CSV đã làm sạch
-vào raw entry point để áp dụng cleaning lần nữa. NB02 dùng helper riêng cho rows đã resolve.
-
-Output riêng tư nằm trong `artifacts/` (gitignored): JSON, stay-event CSV và bản đồ PNG offline.
-Đọc `home.status`, `office.status`, `candidate`, `alternatives`, `coverage`, `diagnostics` và `warnings`.
-`completed` chỉ có nghĩa pipeline hoàn thành; không đảm bảo có dự đoán.
-CLI từ chối user không tồn tại, model/config không hỗ trợ và cấu trúc PLT sai.
-
-Chạy lại EDA, so sánh hai model và sensitivity experiments:
+Mở PowerShell thứ hai ở gốc repo để gửi request `{"user_id":"101"}` tới
+`POST /v2/locations/infer` và đối chiếu với JSON CLI đã lưu.
 
 ```powershell
-py -X utf8 scripts/run_experiments.py --dataset $dataset
-py -X utf8 scripts/validate_contract.py --results artifacts/evaluation
+$env:VIRTUAL_ENV = (Resolve-Path .venv).Path
+py -X utf8 scripts/check_local_api.py --postgres
 ```
 
-Notebook 01 đếm toàn bộ record lines trong thư mục dataset. Lệnh experiment mặc định chạy mọi users;
-chỉ dùng subset nếu người dùng chủ động truyền `--users`. Với input là ZIP, có thể thêm
-`--scan-inventory` để đếm record lines toàn ZIP. Ghi đè output trong thư mục đích; dùng `--output`
-khác để giữ lần chạy trước. Thời gian thực nghiệm là offline processing time, không phải API latency.
+API tra lịch sử theo ID chuỗi trong snapshot `geolife-1.3`, dùng `dbscan-v1` và `baseline-v1`.
+Để đổi snapshot, đặt cùng `GEOLIFE_SNAPSHOT_ID` khi import, khởi động API và kiểm tra.
+Import lại cùng dữ liệu trong cùng snapshot giữ nguyên số bản ghi. API trả `404` nếu
+snapshot thiếu lịch sử cho ID, và `422` nếu lịch sử vượt 100.000 điểm.
 
-Người dùng đã chạy CLI DBSCAN 0.2.0 trên toàn dataset; đã đối chiếu mọi saved outputs với NB02–05:
-counters, stays, memberships, coverage/features, predictions và point traces đều khớp trong float tolerance.
-Report ở `artifacts/pipeline/dbscan-v1/notebook-comparison.json`; các artifact notebook được giữ nguyên.
-CLI heuristic 0.2.0 cũng đã chạy toàn dataset. Xem báo cáo benchmark CP1 để đối chiếu hai model.
-Bộ review định tính 8 users hiện tại nằm ở `artifacts/evaluation/manual-review-sample.csv`; chưa có nhãn reviewer.
+Khi PostgreSQL đang chạy, dùng lệnh sau để kiểm tra import lặp, ID `001`, lịch sử một điểm
+và lịch sử 100.001 điểm. Script mở API trên cổng tạm và tự dọn snapshot kiểm tra.
 
-## Kiến trúc
+```powershell
+$env:GEOLIFE_POSTGRES_DSN = 'host=127.0.0.1 port=55432 dbname=postgres user=geolife'
+py -X utf8 scripts/check_local_api.py --postgres-edge-cases
+```
 
-`data → preprocessing → stays → clustering → features → inference`, điều phối bởi `pipeline`.
-CLI và evaluation tách khỏi core; không phụ thuộc FastAPI/AWS.
-`heuristic-v1` dùng fixed-anchor radius grouping; `dbscan-v1` dùng DBSCAN Haversine.
-Cả hai cùng preprocessing, stay detector, temporal features và output contract.
+## Build và thử Lambda local
 
-- [Architecture](docs/architecture.md), [assumptions](docs/assumptions.md), [data dictionary](docs/data_dictionary.md)
-- [Research notes](docs/research_notes.md), [evaluation procedure](docs/evaluation.md)
-- [OpenAPI](openapi.yaml), [CP1 summary](reports/cp1/summary.md)
-- [Phase reports](reports/cp1/phase_log.md)
+Mở Docker Desktop ở chế độ Linux containers. Dùng PostgreSQL local đã nạp user `101` như trên.
+Từ PowerShell ở gốc repo, build image một lần và chạy hai container với `MODEL_VERSION` tương ứng.
+Ví dụ dùng PostgreSQL Windows trên cổng `55432`, qua địa chỉ Docker Desktop `host.docker.internal`.
+
+```powershell
+$env:VIRTUAL_ENV = (Resolve-Path .venv).Path
+$lambdaDsn = 'host=host.docker.internal port=55432 dbname=postgres user=geolife'
+docker buildx build --platform linux/amd64 --provenance=false --load -f Dockerfile.lambda -t geolife-lambda:local .
+docker run -d --rm --name geolife-lambda-heuristic-19002 -p 127.0.0.1:19002:8080 -e "GEOLIFE_POSTGRES_DSN=$lambdaDsn" -e MODEL_VERSION=heuristic-v1 geolife-lambda:local
+docker run -d --rm --name geolife-lambda-dbscan -p 127.0.0.1:19001:8080 -e "GEOLIFE_POSTGRES_DSN=$lambdaDsn" -e MODEL_VERSION=dbscan-v1 geolife-lambda:local
+```
+
+Gọi trình mô phỏng Lambda và so kết quả từng container với JSON CLI của cùng model.
+
+```powershell
+py -X utf8 scripts/check_local_api.py --lambda-runtime --port 19002 --expected artifacts/pipeline/heuristic-v1/101-heuristic-v1.json
+py -X utf8 scripts/check_local_api.py --lambda-runtime --port 19001
+docker stop geolife-lambda-heuristic-19002 geolife-lambda-dbscan
+```
+
+Handler nhận event HTTP API payload format 2.0. Body suy luận chứa `{"user_id":"101"}`.
+Image dùng Python 3.12 trên Amazon Linux 2023, ghim `baseline-v1` và mặc định tra snapshot
+`geolife-1.3`. Đặt `GEOLIFE_SNAPSHOT_ID` nếu chạy trên snapshot khác.
+
+### Đo hiệu năng Lambda local
+
+Khi Docker Desktop và PostgreSQL đang chạy, dùng image `geolife-lambda:local` đã build.
+
+```powershell
+$env:VIRTUAL_ENV = (Resolve-Path .venv).Path
+py -X utf8 scripts/benchmark_lambda_local.py
+```
+
+Script nạp lịch sử đầy đủ của ba user vào PostgreSQL. Ba user lần lượt có số điểm ở p10, p50 và
+mức cao nhất trong 128 lịch sử có từ 1 đến 100.000 điểm. Mỗi cặp user và model chạy trong một
+container tạm với 2 CPU và 2 GiB, warmup một lần rồi đo năm lần. File kết quả
+`artifacts/cp2/lambda-local-benchmark.json` ghi từng lượt đo, trung vị và peak RSS của tiến trình.
+Thời gian handler gồm đọc DB, suy luận và tạo response. Số đo dành cho handler local, còn HTTP,
+khởi động container và cold start AWS cần đo riêng.
+
+### Thử Lambda với snapshot SQLite
+
+Chạy từ thư mục gốc trong PowerShell. Snapshot demo chứa toàn bộ lịch sử của user `101`,
+`117`, `125` và `145`.
+
+```powershell
+$env:VIRTUAL_ENV = (Resolve-Path .venv).Path
+py -X utf8 scripts/export_sqlite_snapshot.py --users 101 117 125 145 --snapshot geolife-1.3-demo-v1
+docker buildx build --platform linux/amd64 --provenance=false --load --target sqlite-demo --build-context demo_snapshot=artifacts/cp2/sqlite -f Dockerfile.lambda -t geolife-lambda:sqlite-demo .
+docker run -d --rm --name geolife-sqlite-blue -p 127.0.0.1:19102:8080 -e MODEL_VERSION=heuristic-v1 geolife-lambda:sqlite-demo
+docker run -d --rm --name geolife-sqlite-green -p 127.0.0.1:19101:8080 -e MODEL_VERSION=dbscan-v1 geolife-lambda:sqlite-demo
+py -X utf8 scripts/check_local_api.py --lambda-runtime --port 19102 --snapshot geolife-1.3-demo-v1 --expected artifacts/pipeline/heuristic-v1/101-heuristic-v1.json
+py -X utf8 scripts/check_local_api.py --lambda-runtime --port 19101 --snapshot geolife-1.3-demo-v1
+docker stop geolife-sqlite-blue geolife-sqlite-green
+```
+
+Các bước đưa image demo lên AWS nằm trong [hướng dẫn triển khai SQLite](docs/cp2-sqlite-deploy.md).
+
+### Demo CP2 trên Kubernetes local
+
+Demo serverless, canary 90/10 và rollback trên cùng URL dùng
+[Knative Serving và Kourier](docs/cp2-knative-deploy.md).
+
+Chạy hai phiên bản API với snapshot SQLite, kiểm tra Green qua Service preview rồi chuyển và
+rollback qua cùng Service live. [Hướng dẫn triển khai Kubernetes](docs/cp2-kubernetes-deploy.md)
 
 ## Dữ liệu và giới hạn
 
-Đọc điều khoản trong User Guide 1.3 trước khi sử dụng dataset; guide ghi non-commercial use
-và có giới hạn phân phối. Không thêm ZIP, PLT, tọa độ suy luận hoặc bản đồ người dùng vào Git.
-Notebook dùng một file duy nhất, có thể giữ cả code, bảng kết quả và biểu đồ để học.
-CP1 dừng ở pipeline offline và OpenAPI draft; không có endpoint đang chạy.
-Sampling thiếu, lịch làm việc khác giờ hành chính, du lịch, GPS jitter và đi bộ chậm đều có thể gây sai.
-Các ngưỡng mặc định là giả thuyết, chưa tối ưu hoặc xác nhận bằng nhãn độc lập.
+Home và Office là ứng viên suy ra từ hành vi. Kết quả có thể là `unknown`
+khi thiếu bằng chứng, và điểm bằng chứng không biểu thị xác suất.
+GeoLife không có nhãn độc lập để kiểm chứng độ chính xác Home/Office.
+GPS thưa, nhiễu vị trí và giờ sinh hoạt khác giả định đều có thể ảnh hưởng kết quả.
 
-## Bàn giao CP01
+Xem điều khoản sử dụng trong GeoLife User Guide 1.3. Dữ liệu GPS và kết quả
+chứa tọa độ cá nhân được giữ ngoài Git.
 
-- [Báo cáo benchmark B1–B6](reports/cp1/benchmark.md) và [tóm tắt kết quả](reports/cp1/summary.md).
-- [Slide báo cáo 17 trang](exports/CP1_GeoLife_BaoCao_17slides.pptx).
-- [Bảng số liệu, biểu đồ và audit tổng hợp](reports/cp1/artifacts/README.md).
+## Tài liệu dự án
+
+- [Notebook](notebooks/README.md) — khám phá dữ liệu và từng bước của pipeline.
+- [Báo cáo benchmark CP1](reports/cp1/benchmark.md) — so sánh làm sạch, phát hiện lần dừng và độ ổn định Home/Office.
+- [Kế hoạch](PLAN.md) · [Checkpoint](CHECKPOINT.md) — tiến độ, bàn giao và lệnh chạy.
