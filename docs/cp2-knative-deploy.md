@@ -175,15 +175,23 @@ và một instance Cloud SQL for PostgreSQL đã tạo. [Kết nối GKE với C
 Trong Cloud Shell đã đăng nhập đúng project, chạy từ thư mục repo.
 
 ```bash
-bash scripts/provision_gke_demo.sh YOUR_PROJECT_ID
+bash scripts/provision_gke_demo.sh YOUR_PROJECT_ID --with-public-nat
 ```
 
-Script kiểm tra Billing rồi tạo VPC và subnet dành cho GeoLife, kết nối riêng tới Cloud SQL,
-GKE Standard ở `asia-southeast1-b` với hai node `e2-standard-2`, và PostgreSQL Enterprise cùng zone
-với 1 vCPU, 3,75 GiB RAM và SSD 20 GB. Database demo được nạp lại từ snapshot nên dùng cấu hình
-không bật backup tự động. Cuối lượt chạy, script kết nối `kubectl` qua DNS endpoint của GKE và
-in danh sách node cùng trạng thái Cloud SQL. GKE và Cloud SQL bắt đầu tính phí theo tài nguyên đã tạo.
-[Tạo cụm GKE](https://docs.cloud.google.com/sdk/gcloud/reference/container/clusters/create) · [Tạo Cloud SQL](https://docs.cloud.google.com/sql/docs/postgres/create-instance)
+Script kiểm tra billing, chuẩn bị VPC và subnet riêng cho GeoLife, rồi tạo GKE Standard ở
+`asia-southeast1-b` với hai node `e2-standard-2` chỉ có IP nội bộ. Script dùng DNS endpoint để
+kết nối `kubectl` và chờ các node `Ready` trước khi tạo Cloud SQL. Nếu cụm đã tồn tại và đang
+`ERROR`, kiểm tra lỗi của cụm trước khi chạy lại.
+[Cấu hình mạng GKE](https://docs.cloud.google.com/kubernetes-engine/docs/how-to/latest/network-isolation)
+
+Tùy chọn `--with-public-nat` tạo Cloud NAT dành cho subnet GKE để node tải image từ GHCR và
+các registry công cộng. Có thể bỏ tùy chọn này nếu subnet đã có đường ra Internet. Cloud NAT
+có phí theo giờ, IP và dung lượng xử lý.
+[Cloud NAT](https://docs.cloud.google.com/nat/docs/public-nat) · [Giá Cloud NAT](https://cloud.google.com/nat/pricing)
+
+Cloud SQL for PostgreSQL Enterprise dùng IP riêng trong cùng zone, với 1 vCPU, 3,75 GiB RAM
+và SSD 20 GB. Database demo được nạp lại từ snapshot nên dùng cấu hình không bật backup tự động.
+[Tạo Cloud SQL](https://docs.cloud.google.com/sql/docs/postgres/create-instance)
 
 ### Nạp snapshot vào Cloud SQL
 

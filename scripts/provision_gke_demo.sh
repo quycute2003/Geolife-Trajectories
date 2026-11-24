@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-project_id=${1:?Usage: bash scripts/provision_gke_demo.sh PROJECT_ID}
+if (( $# < 1 || $# > 2 )) || [[ $# == 2 && "$2" != --with-public-nat ]]; then
+  printf 'Usage: bash scripts/provision_gke_demo.sh PROJECT_ID [--with-public-nat]\n' >&2
+  exit 2
+fi
+project_id=$1
+public_nat=${2:-}
 if [[ ! "$project_id" =~ ^[a-z][a-z0-9-]{4,28}[a-z0-9]$ ]]; then
   printf 'Invalid Google Cloud project ID: %s\n' "$project_id" >&2
   exit 2
@@ -16,6 +21,8 @@ cluster=geolife-cp2
 instance=geolife-cp2-pg
 node_account_id=geolife-cp2-gke-node
 node_account="$node_account_id@$project_id.iam.gserviceaccount.com"
+router=geolife-cp2-router
+nat_gateway=geolife-cp2-nat
 gcp=(gcloud --project="$project_id" --quiet)
 
 resource_missing() {
@@ -32,6 +39,14 @@ fi
 
 "${gcp[@]}" services enable compute.googleapis.com container.googleapis.com \
   sqladmin.googleapis.com servicenetworking.googleapis.com iam.googleapis.com
+
+cluster_status=$("${gcp[@]}" container clusters list --location="$zone" \
+  --filter="name=$cluster" --format='value(status)')
+if [[ -n "$cluster_status" && "$cluster_status" != RUNNING ]]; then
+  printf 'Cluster %s in %s has status %s. Resolve the cluster state before rerunning.\n' \
+    "$cluster" "$zone" "$cluster_status" >&2
+  exit 1
+fi
 
 if resource_missing compute networks list --filter="name=$network" --format='value(name)'; then
   "${gcp[@]}" compute networks create "$network" --subnet-mode=custom
@@ -68,13 +83,29 @@ for delay in 5 10 20 40 60 0; do
   sleep "$delay"
 done
 
-if resource_missing container clusters list --location="$zone" --filter="name=$cluster" --format='value(name)'; then
+if [[ -z "$cluster_status" ]]; then
   "${gcp[@]}" container clusters create "$cluster" --zone="$zone" --release-channel=regular \
     --machine-type=e2-standard-2 --num-nodes=2 --disk-type=pd-balanced --disk-size=30 \
-    --network="$network" --subnetwork="$subnet" --enable-ip-alias \
+    --network="$network" --subnetwork="$subnet" --enable-ip-alias --enable-private-nodes \
     --cluster-secondary-range-name=geolife-pods --services-secondary-range-name=geolife-services \
     --enable-dns-access --no-enable-ip-access --service-account="$node_account" \
     --workload-pool="$project_id.svc.id.goog"
+fi
+
+"${gcp[@]}" container clusters get-credentials "$cluster" --zone="$zone" --dns-endpoint
+kubectl wait --for=condition=Ready node --all --timeout=180s
+kubectl get nodes -o wide
+
+if [[ "$public_nat" == --with-public-nat ]]; then
+  if resource_missing compute routers list --regions="$region" \
+    --filter="name=$router" --format='value(name)'; then
+    "${gcp[@]}" compute routers create "$router" --network="$network" --region="$region"
+  fi
+  nat_names=$("${gcp[@]}" compute routers nats list --router="$router" --region="$region" --format='value(name)')
+  if ! grep -Fxq "$nat_gateway" <<< "$nat_names"; then
+    "${gcp[@]}" compute routers nats create "$nat_gateway" --router="$router" --region="$region" \
+      --nat-custom-subnet-ip-ranges="$subnet:ALL" --auto-allocate-nat-external-ips
+  fi
 fi
 
 if resource_missing sql instances list --filter="name=$instance" --format='value(name)'; then
@@ -87,7 +118,5 @@ if resource_missing sql databases list --instance="$instance" --filter='name=geo
   "${gcp[@]}" sql databases create geolife --instance="$instance"
 fi
 
-"${gcp[@]}" container clusters get-credentials "$cluster" --zone="$zone" --dns-endpoint
-kubectl get nodes -o wide
 "${gcp[@]}" sql instances describe "$instance" \
   --format='table(name,state,databaseVersion,region,settings.tier)'
