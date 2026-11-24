@@ -54,9 +54,19 @@ fi
 if resource_missing iam service-accounts list --filter="email=$node_account" --format='value(email)'; then
   "${gcp[@]}" iam service-accounts create "$node_account_id" --display-name='GeoLife CP2 GKE nodes'
 fi
-"${gcp[@]}" projects add-iam-policy-binding "$project_id" \
-  --member="serviceAccount:$node_account" --role=roles/container.defaultNodeServiceAccount \
-  --condition=None --format=none
+for delay in 5 10 20 40 60 0; do
+  if binding_output=$("${gcp[@]}" projects add-iam-policy-binding "$project_id" \
+    --member="serviceAccount:$node_account" --role=roles/container.defaultNodeServiceAccount \
+    --condition=None --format=none 2>&1); then
+    break
+  fi
+  if [[ "$delay" == 0 || "$binding_output" != *"Service account $node_account does not exist"* ]]; then
+    printf '%s\n' "$binding_output" >&2
+    exit 1
+  fi
+  printf 'Waiting %s seconds for the GKE node service account to propagate.\n' "$delay"
+  sleep "$delay"
+done
 
 if resource_missing container clusters list --location="$zone" --filter="name=$cluster" --format='value(name)'; then
   "${gcp[@]}" container clusters create "$cluster" --zone="$zone" --release-channel=regular \
