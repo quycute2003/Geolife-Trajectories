@@ -1,6 +1,6 @@
 # Dàn ý trình bày Checkpoint 2 · GeoLife
 
-Thời lượng đề xuất **10–11 phút**, gồm khoảng **2–3 phút demo**. Trọng tâm là kiến trúc PostgreSQL và MLflow, vai trò của Knative và Kourier, và cách kết hợp Blue/Green với canary.
+Thời lượng đề xuất **10–11 phút**, gồm khoảng **2–3 phút demo**. Trọng tâm là kiến trúc PostgreSQL và MLflow, vai trò của Knative và Kourier, và cách phát hành canary.
 
 ## 1. Bài toán và kết quả CP2 · 45 giây
 
@@ -16,7 +16,7 @@ Thời lượng đề xuất **10–11 phút**, gồm khoảng **2–3 phút dem
 | --- | --- | --- |
 | Chạy suy luận theo request, giảm về 0 khi rảnh | **AWS Lambda** chạy handler suy luận | **Kubernetes** quản lý pod của container API HTTP. **Knative Serving** khởi động pod theo request và giảm pod của Revision về 0 khi rảnh. **Docker Desktop** cung cấp cluster để demo trên máy. |
 | Đưa request HTTP vào hệ thống | **API Gateway HTTP API** chuyển request đến alias Lambda | **Kourier** nhận HTTP và chuyển theo Knative Route. Demo local truy cập qua **`kubectl port-forward`**. HTTPS và xác thực cho endpoint cloud là phần cần hoàn thiện khi mở truy cập từ xa. |
-| Giữ hai bản và đổi traffic trên một URL | **Lambda published versions + alias `prod`** có trọng số | **Knative Revisions** giữ Blue/Green. **Knative Route** đặt trọng số canary 90/10, chuyển 100% và rollback. URL có tag dùng để kiểm tra từng bản trước khi đổi live. |
+| Giữ hai bản và đổi traffic trên một URL | **Lambda published versions + alias `prod`** có trọng số | **Knative Revisions** giữ bản hiện tại và bản thử nghiệm. **Knative Route** đặt trọng số canary 90/10 để thử bản mới trước khi promote hoặc rollback. |
 | Lưu và phân phối image | **Amazon ECR** lưu image Lambda | **Docker Buildx** đóng gói image HTTP. Cluster local dùng image có sẵn trong Docker Desktop. Khi lên cloud sẽ push vào registry private rồi để cluster pull, ví dụ **Artifact Registry** nếu chọn GKE. |
 | Lưu lịch sử GPS | **PostgreSQL trên RDS** là hướng ban đầu cho dữ liệu đầy đủ. | **PostgreSQL** dùng cho demo local và bản cloud. Hai Revision đọc cùng snapshot full từ DB. Đã kiểm chứng PostgreSQL local và chuẩn bị manifest đọc DSN từ **Kubernetes Secret**. |
 | Khai báo và cập nhật triển khai | **CloudFormation** tạo tài nguyên và cập nhật alias | **Manifest YAML + `kubectl`** khai báo Knative Service. Script `knative_rollout.py` thực hiện stage, canary, promote và rollback. |
@@ -70,16 +70,16 @@ flowchart TD
 - Mở model `geolife-home-office` trong MLflow local và chọn một version. Chỉ ra alias, config, snapshot, image, Revision và kết quả kiểm tra CLI. Gói trên Registry dùng snapshot SQLite demo. Báo cáo release ghi image và snapshot PostgreSQL full đã chạy trên Knative.
 - Trên 182 user với cùng đầu vào, số user có gợi ý Nhà là **28 → 37** và Công ty là **8 → 18** khi đổi từ heuristic sang DBSCAN. Đây là **độ phủ gợi ý**. Độ đúng ngoài thực tế còn thiếu nhãn độc lập.
 
-## 6. Blue/Green kết hợp Canary · 1 phút
+## 6. Phát hành canary · 1 phút
 
-**Blue/Green** là cách giữ hai Revision để kiểm tra Green và có thể quay về Blue. **Canary** là bước cho Green nhận một phần traffic live trước khi chuyển toàn bộ. CP2 dùng hai cách trong cùng một quy trình release.
+Ứng viên `dbscan-v1` được kiểm tra qua URL có tag, sau đó nhận **10% traffic live**. Nếu số đo đạt tiêu chí, chuyển toàn bộ traffic sang ứng viên. Nếu có lỗi, đưa traffic về `heuristic-v1`.
 
-| Bước trên cùng URL live | Blue | Green | Mục đích |
+| Bước trên cùng URL live | Bản hiện tại | Bản thử nghiệm | Mục đích |
 | --- | ---: | ---: | --- |
-| **Stage và preview** | 100% | 0% | Kiểm tra Green qua URL tag trước khi cho nhận request live. |
+| **Stage và preview** | 100% | 0% | Kiểm tra ứng viên qua URL tag trước khi cho nhận request live. |
 | **Canary** | 90% | 10% | Thử chia traffic và theo dõi số request, lỗi, latency theo model. |
-| **Promote** | 0% | 100% | Chuyển URL live sang Green bằng cách đổi trọng số Route. |
-| **Rollback** | 100% | 0% | Trả URL live về Blue. Có thể rollback từ lúc canary hoặc sau promote. |
+| **Promote** | 0% | 100% | Chuyển URL live sang bản thử nghiệm bằng cách đổi trọng số Route. |
+| **Rollback** | 100% | 0% | Trả URL live về bản ban đầu. Có thể rollback từ lúc canary hoặc sau promote. |
 
 ## 7. Demo PostgreSQL có lời dẫn · 2–3 phút
 

@@ -200,7 +200,7 @@
         <article class="card">
           <h3>Kourier</h3>
           <p>Cổng nhận request HTTP cho dịch vụ chạy bằng Knative.</p>
-          <ul><li>Nhận request từ app đặt xe qua một URL.</li><li>Chuyển request vào Blue hoặc Green theo tỷ lệ đã đặt.</li></ul>
+          <ul><li>Nhận request từ app đặt xe qua một URL.</li><li>Chuyển request vào bản hiện tại hoặc bản thử nghiệm theo tỷ lệ đã đặt.</li></ul>
         </article>
       </div>
       <aside class="notes">Kubernetes chạy pod chứa API. Knative gọi mỗi phiên bản triển khai là một Revision. Route giữ URL và tỷ lệ gửi request vào từng Revision. Kourier dùng Envoy để nhận và chuyển request theo Route. Khi một Revision đang có 0 pod, Knative khởi động pod khi có request. Demo local truy cập Kourier bằng kubectl port-forward.</aside>
@@ -210,7 +210,7 @@
       <header><p class="eyebrow">Kiến trúc demo</p><h2 id="title-5">Một API gợi ý, hai phiên bản dùng chung PostgreSQL</h2></header>
       <svg class="diagram" viewBox="0 0 1728 736" role="img" aria-labelledby="arch-title arch-desc">
         <title id="arch-title">Kiến trúc API GeoLife trên Kubernetes</title>
-        <desc id="arch-desc">Ứng dụng đặt xe gửi user_id qua Kourier. Trong Kubernetes, Knative Route đặt tỷ lệ chia request vào Blue hoặc Green. Cả hai đọc lịch sử GPS hoặc kết quả đã tính từ PostgreSQL. Khi phát hành, script đăng ký hai phiên bản vào MLflow Model Registry.</desc>
+        <desc id="arch-desc">Ứng dụng đặt xe gửi user_id qua Kourier. Trong Kubernetes, Knative Route đặt tỷ lệ chia request vào bản hiện tại hoặc bản thử nghiệm. Cả hai đọc lịch sử GPS hoặc kết quả đã tính từ PostgreSQL. Khi phát hành, script đăng ký hai phiên bản vào MLflow Model Registry.</desc>
         <defs><marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4" orient="auto"><path d="M0 0L8 4 0 8" fill="none" stroke="#0F766E" stroke-width="1.2"/></marker></defs>
 
         <rect class="boundary" x="364" y="24" width="924" height="501" rx="32"/>
@@ -240,11 +240,11 @@
         <text class="detail" x="432" y="341">Nhận và chuyển HTTP</text>
 
         <rect class="box" x="864" y="111" width="354" height="131" rx="24"/>
-        <text x="892" y="161">Blue Revision</text>
+        <text x="892" y="161">Revision hiện tại</text>
         <text class="detail" x="892" y="202">API · heuristic-v1</text>
 
         <rect class="box" x="864" y="345" width="354" height="131" rx="24"/>
-        <text x="892" y="395">Green Revision</text>
+        <text x="892" y="395">Revision thử nghiệm</text>
         <text class="detail" x="892" y="436">API · dbscan-v1</text>
         <text class="detail" x="864" y="510">Kết nối DB qua Secret</text>
 
@@ -265,7 +265,7 @@
         <text x="892" y="629">MLflow Model Registry</text>
         <text class="detail" x="892" y="665">geolife-home-office · Version 1 heuristic · Version 2 DBSCAN</text>
       </svg>
-      <aside class="notes">App gửi user_id qua Kourier và nhận lại Nhà, Công ty, POI cùng phiên bản model. Nét đứt biểu thị Knative Route cung cấp cấu hình định tuyến cho Kourier. Blue và Green dùng cùng image API và cấu hình baseline-v1. Cả hai đọc snapshot geolife-1.3-full-v1 từ PostgreSQL qua Kubernetes Secret. Script đăng ký lưu hai gói thuật toán vào MLflow để đối chiếu khi phát hành. Gói MLflow hiện dùng snapshot SQLite demo. Request API chạy bằng image đã triển khai.</aside>
+      <aside class="notes">App gửi user_id qua Kourier và nhận lại Nhà, Công ty, POI cùng phiên bản model. Nét đứt biểu thị Knative Route cung cấp cấu hình định tuyến cho Kourier. Hai Revision dùng cùng image API và cấu hình baseline-v1. Cả hai đọc snapshot geolife-1.3-full-v1 từ PostgreSQL qua Kubernetes Secret. Script đăng ký lưu hai gói thuật toán vào MLflow để đối chiếu khi phát hành. Gói MLflow hiện dùng snapshot SQLite demo. Request API chạy bằng image đã triển khai.</aside>
     </section>
 
     <section class="slide" aria-labelledby="title-6">
@@ -280,21 +280,21 @@
     <section class="slide" aria-labelledby="title-7">
       <header><p class="eyebrow">MLflow Model Registry</p><h2 id="title-7">MLflow lưu hồ sơ của hai phiên bản thuật toán</h2></header>
       <div class="two-col">
-        <article class="card"><span class="tag">Version 1 · Blue</span><h3>heuristic-v1</h3><p>Gom cụm theo bán kính quanh điểm neo.</p></article>
-        <article class="card"><span class="tag">Version 2 · Green</span><h3>dbscan-v1</h3><p>Gom cụm theo mật độ và đánh dấu nhiễu.</p></article>
+        <article class="card"><span class="tag">Version 1 · Hiện tại</span><h3>heuristic-v1</h3><p>Gom cụm theo bán kính quanh điểm neo.</p></article>
+        <article class="card"><span class="tag">Version 2 · Thử nghiệm</span><h3>dbscan-v1</h3><p>Gom cụm theo mật độ và đánh dấu nhiễu.</p></article>
       </div>
       <aside class="notes">Mở hai alias heuristic-v1 và dbscan-v1 trong MLflow local. Hai gói đã đăng ký và được tải lại để đối chiếu CLI. Hồ sơ đăng ký hiện tại thuộc lượt đóng gói SQLite. Bản rollout PostgreSQL chạy image HTTP riêng, dùng model và snapshot ghi trong API. MLflow phục vụ truy vết, còn Knative Route điều khiển traffic.</aside>
     </section>
 
     <section class="slide" aria-labelledby="title-8">
-      <header><p class="eyebrow">Tỷ lệ request Blue / Green</p><h2 id="title-8">Blue/Green giữ bản cũ, canary cho Green nhận thử 10% traffic</h2></header>
+      <header><p class="eyebrow">Tỷ lệ bản hiện tại / bản thử nghiệm</p><h2 id="title-8">Canary cho bản mới nhận thử 10% lưu lượng</h2></header>
       <div class="steps">
-        <article class="card"><h3>Preview</h3><strong class="weight">100% / 0%</strong><small>Test Green qua URL riêng.</small></article>
+        <article class="card"><h3>Preview</h3><strong class="weight">100% / 0%</strong><small>Thử bản mới qua URL riêng.</small></article>
         <article class="card"><span class="tag accent">Canary</span><strong class="weight">90% / 10%</strong><small>Đo tỉ lệ, lỗi và latency.</small></article>
-        <article class="card"><h3>Promote</h3><strong class="weight">0% / 100%</strong><small>Green nhận toàn bộ traffic.</small></article>
-        <article class="card"><h3>Rollback</h3><strong class="weight">100% / 0%</strong><small>Đưa traffic về Blue.</small></article>
+        <article class="card"><h3>Promote</h3><strong class="weight">0% / 100%</strong><small>Bản mới nhận toàn bộ traffic.</small></article>
+        <article class="card"><h3>Rollback</h3><strong class="weight">100% / 0%</strong><small>Đưa traffic về bản ban đầu.</small></article>
       </div>
-      <aside class="notes">Các tỷ lệ trên slide theo thứ tự Blue / Green trên cùng URL live. Blue/Green giữ hai Revision sẵn để kiểm tra hoặc chuyển về. Canary giới hạn phần traffic chuyển sang Green trước promote. Tỉ lệ quan sát dao động quanh trọng số. Các bước promote và rollback trong CP2 do người vận hành chạy.</aside>
+      <aside class="notes">Tỷ lệ theo thứ tự bản hiện tại / bản thử nghiệm trên cùng URL live. Ứng viên dbscan-v1 nhận 10% traffic trong bước canary. Khi số đo đạt tiêu chí, promote lên 100%. Nếu có lỗi, rollback về heuristic-v1. Tỷ lệ quan sát có thể dao động quanh trọng số.</aside>
     </section>
 
     <section class="slide" aria-labelledby="title-9">
@@ -311,7 +311,7 @@
         <div class="hero-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5a8.5 8.5 0 1 1 3.5 6.9L3 20l1.6-3.5A8.5 8.5 0 0 1 3 11.5Z"/><path d="M9 10a3 3 0 1 1 4.5 2.6c-1 .6-1.5 1-1.5 1.9m0 2h.01"/></svg></div>
         <p class="eyebrow">GeoLife · Checkpoint 2</p><h1 id="title-10">Một URL.<br>Hai phiên bản đã kiểm chứng.</h1><p>Cảm ơn anh đã theo dõi. Mình cùng xem demo và trao đổi.</p>
       </div>
-      <aside class="notes">Khi chạy demo trực tiếp, bắt đầu ở Blue 100% và mở preview Green. Trình diễn promote rồi rollback qua cùng một URL nếu thời gian có hạn. Số liệu canary đến từ lượt diễn tập 100 request.</aside>
+      <aside class="notes">Khi chạy demo trực tiếp, bắt đầu với 100% traffic vào bản hiện tại và mở URL thử của ứng viên. Trình diễn promote rồi rollback qua cùng một URL nếu thời gian có hạn. Số liệu canary đến từ lượt diễn tập 100 request.</aside>
     </section>
 
     <nav class="controls" aria-label="Điều khiển trình chiếu">

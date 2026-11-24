@@ -292,11 +292,15 @@ kubectl @gke wait --for=condition=Ready ksvc/geolife-inference --timeout=180s
 if ($LASTEXITCODE -ne 0) { throw 'Blue chưa sẵn sàng.' }
 ```
 
-### Kiểm tra Blue, Green, canary và rollback
+### Kiểm thử trước khi chia traffic canary
 
 Mở `kubectl --context $gkeCtx -n kourier-system port-forward svc/kourier-internal 18080:80`
 ở cửa sổ riêng. Đo bằng API v2 để kiểm tra kết nối DB và dữ liệu. `101` kiểm tra suy luận trực
 tiếp, `153` kiểm tra kết quả đã tính trước cho lịch sử dài.
+
+CP2 dùng canary 90/10 trên cùng URL live. Các lệnh dùng tag `blue` cho bản hiện tại và `green`
+cho ứng viên. Đoạn lệnh bên dưới kiểm tra hai URL có tag trước khi chia traffic, rồi diễn tập
+promote và rollback.
 
 ```powershell
 $rollout = @('--context', $gkeCtx, '--namespace', $ns, '--snapshot', $snapshot)

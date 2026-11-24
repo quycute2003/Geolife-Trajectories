@@ -88,10 +88,13 @@ Luồng: **GPS points → làm sạch → stays → clusters → temporal eviden
   [kết quả rollout](reports/cp2/release.md#canary-knative-với-postgresql-ngày-2026-11-19)
   và [slide Checkpoint 2](exports/GeoLife-Checkpoint-2.html).
 - **Đợt đầu trên Google Cloud (22/11):** triển khai API nội bộ trên GKE + Knative/Kourier,
-  kéo image private từ GHCR và nạp snapshot đầy đủ vào Cloud SQL for PostgreSQL. Sau khi Blue,
-  Green, canary và rollback qua kiểm tra, triển khai giao diện đặt xe và MLflow. Đã chuẩn bị
+  kéo image private từ GHCR và nạp snapshot đầy đủ vào Cloud SQL for PostgreSQL. Sau khi kiểm tra
+  hai Revision, canary và rollback, triển khai giao diện đặt xe và MLflow. Đã chuẩn bị
   render manifest với image theo digest. Cần project và cụm GKE để chạy bản cloud.
   [Hướng dẫn triển khai](docs/cp2-knative-deploy.md#postgresql-cho-bản-cloud)
+- **Chiến lược phát hành CP2:** demo canary trên cùng URL. Kiểm tra ứng viên qua URL có tag,
+  đưa 10% traffic sang ứng viên rồi chọn promote hoặc rollback. Tag `blue` là bản hiện tại,
+  tag `green` là bản thử nghiệm trong các lệnh diễn tập.
 - Người dùng đã yêu cầu bỏ quy trình/checklist/gate mentor review/approval.
 
 ## 2. Cách làm việc người dùng muốn

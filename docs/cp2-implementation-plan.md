@@ -1,27 +1,24 @@
-# Kế hoạch CP2 · GeoLife trên Kubernetes local
+# Kế hoạch CP2 · Triển khai và phát hành canary cho GeoLife
 
-Cập nhật **2026-11-18**. CP2 bàn giao API gợi ý điểm đến, hai phiên bản model truy vết được
-và bằng chứng scale-to-zero, canary, promote và rollback. Demo chạy trên máy Windows với
-Docker Desktop, Knative Serving và Kourier. Endpoint demo có phạm vi local. Yêu cầu AWS
-ban đầu được ghi trong [quy trình triển khai AWS đã thử](cp2-sqlite-deploy.md).
-
-Kiểm chứng API, scale-to-zero, canary và rollback trên cluster local trước. Nếu bản local
-chạy ổn và cần mở endpoint cho người khác truy cập, chọn môi trường từ xa, triển khai cùng
-phiên bản và kiểm tra lại endpoint, canary và rollback trên môi trường đó.
+Cập nhật **2026-11-24**. CP2 bàn giao API gợi ý điểm đến, hai phiên bản model truy vết được
+và bằng chứng scale-to-zero, canary, promote và rollback. Đã diễn tập trên Docker Desktop với
+Knative Serving, Kourier và PostgreSQL local. Bước còn lại là kiểm chứng API nội bộ trên GKE
+với Cloud SQL for PostgreSQL. Yêu cầu AWS ban đầu được ghi trong [quy trình đã thử](cp2-sqlite-deploy.md).
 
 Client gửi `user_id` tại `POST /v2/locations/infer`. API đọc lịch sử GeoLife rồi trả gợi ý
-Home, Office, POI và metadata bản thực thi. Cả Blue và Green dùng cùng snapshot SQLite
-chỉ đọc `geolife-1.3-demo-v1` và cấu hình `baseline-v1`.
+Home, Office, POI và metadata bản thực thi. Hai Revision dùng cùng snapshot PostgreSQL
+`geolife-1.3-full-v1` và cấu hình `baseline-v1`. Các lượt kiểm tra SQLite dùng snapshot demo
+`geolife-1.3-demo-v1` được ghi lại ở các mục bên dưới.
 
 Bản cloud đã chốt PostgreSQL cho hai Revision. Nạp snapshot `geolife-1.3-full-v1` và kết quả
 đã tính cho các lịch sử dài bằng `scripts/import_postgres.py --sqlite`. API dùng cùng request
 `user_id`. Xem [hướng dẫn PostgreSQL](cp2-knative-deploy.md#postgresql-cho-bản-cloud).
 
 ```text
-Dữ liệu       GeoLife PLT → snapshot SQLite → image HTTP local
-Suy luận      Client local → port-forward → Kourier áp dụng Knative Route
-                           → Blue heuristic-v1 hoặc Green dbscan-v1 → API đọc SQLite
-Truy vết      Revision / image / config / snapshot → MLflow Model Registry local
+Dữ liệu       GeoLife PLT → snapshot SQLite → PostgreSQL local hoặc Cloud SQL
+Suy luận      Client → Kourier áp dụng Knative Route
+                     → heuristic-v1 hoặc dbscan-v1 → API đọc PostgreSQL
+Truy vết      Revision / image / config / snapshot → hồ sơ phát hành và MLflow local
 ```
 
 ## 1. Tuần 3 · API local và đối chiếu
@@ -80,9 +77,12 @@ Truy vết      Revision / image / config / snapshot → MLflow Model Registry l
 
 ## 4. Tuần 4 · Canary, promote và rollback
 
-| Bước | Blue | Green | Kiểm tra |
+CP2 trình diễn **canary**. Kiểm thử bản ứng viên qua URL có tag trước khi cấp traffic live.
+Tag `blue` là bản hiện tại (`heuristic-v1`), tag `green` là bản thử nghiệm (`dbscan-v1`).
+
+| Bước | Bản hiện tại | Bản thử nghiệm | Kiểm tra |
 | --- | ---: | ---: | --- |
-| Stage Green | 100% | 0% | Gọi URL tag Green và so với CLI |
+| Stage | 100% | 0% | Gọi URL kiểm thử của bản ứng viên và so với CLI |
 | Canary | 90% | 10% | Gửi request vào cùng URL live, kiểm tra hai model đều nhận traffic |
 | Promote | 0% | 100% | Cùng URL live trả `dbscan-v1` |
 | Rollback | 100% | 0% | Cùng URL live trả lại `heuristic-v1` |
@@ -107,13 +107,22 @@ Truy vết      Revision / image / config / snapshot → MLflow Model Registry l
   chứng scale-to-zero, canary, promote, rollback. Dừng port-forward và dọn tài nguyên
   demo sau khi lưu kết quả.
 
-| Chiến lược | Cách áp dụng cho GeoLife |
-| --- | --- |
-| Shadow | Blue trả lời, Green nhận bản sao request để đối chiếu kết quả. Giải thích trong bàn giao. |
-| Canary | Knative Route gửi một phần request live sang Green. Demo với trọng số 90/10. |
-| Blue-green | Kiểm thử Green qua URL tag, rồi chuyển live sang Green và diễn tập đưa live về Blue. |
+Shadow là phương án tham chiếu. Bản hiện tại trả lời client và ứng viên nhận bản sao request để đối chiếu kết quả.
 
-## 5. Kết quả triển khai trước khi đổi hướng
+## 5. Kiểm chứng bản triển khai Google Cloud
+
+- [ ] Push image API target `postgres` lên GHCR ở chế độ private và lưu image digest.
+- [ ] Nạp snapshot `geolife-1.3-full-v1` vào Cloud SQL với 182 user, 24.876.978 điểm GPS
+  và 108 kết quả tính trước. Hai Revision dùng chung snapshot và tài khoản chỉ đọc.
+- [ ] Triển khai Knative/Kourier trên GKE. Kiểm tra `/health`, `/version` và đối chiếu API
+  v2 với JSON CLI cho user `101` và `153` trên cả hai Revision.
+- [ ] Chạy canary 90/10 trên cùng URL. Lưu số lượt theo model, tỷ lệ lỗi và p95. Kiểm chứng
+  promote lên 100% ứng viên và rollback về 100% bản ban đầu trên URL đó.
+- [ ] Ghi image digest, snapshot, phiên bản model và kết quả kiểm tra cloud vào báo cáo CP2.
+
+[Các lệnh triển khai và kiểm chứng](cp2-knative-deploy.md#postgresql-cho-bản-cloud)
+
+## 6. Kết quả triển khai trước khi đổi hướng
 
 Bản Lambda đã build, chạy được bằng emulator local và cho kết quả khớp JSON CLI.
 Đã push image demo vào ECR tại `ap-southeast-2`. CloudFormation dừng ở bước tạo Lambda

@@ -598,8 +598,8 @@ cách giữ cùng URL khi chia traffic hoặc quay lại Blue.
   `model_version`. Diễn tập promote **100% Green** và rollback **100% Blue** trên cùng URL.
 - [ ] Đăng ký hai phiên bản trong MLflow Model Registry local và liên kết với Revision, Git commit,
   image, cấu hình, snapshot và kết quả kiểm tra. Registry chưa được dựng.
-- [ ] Bàn giao sơ đồ, endpoint local, số đo, log và giới hạn demo. Giải thích Shadow, Canary
-  và Blue-green. Canary và rollback là các bước chạy thực nghiệm.
+- [ ] Bàn giao sơ đồ, endpoint, số đo, log và giới hạn demo. Trình bày canary trên cùng URL,
+  từ kiểm thử bản mới đến promote hoặc rollback. Shadow là phương án tham chiếu trong phần giải thích.
 
 **Sản phẩm** gồm endpoint local đã xác minh, hai bản model truy vết được, bằng chứng scale-to-zero,
 canary và rollback. Xem [các bước CP2](docs/cp2-implementation-plan.md).
