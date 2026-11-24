@@ -87,6 +87,11 @@ Luồng: **GPS points → làm sạch → stays → clusters → temporal eviden
   Xem [hướng dẫn chạy lại](docs/cp2-knative-deploy.md#demo-postgresql-trên-docker-desktop),
   [kết quả rollout](reports/cp2/release.md#canary-knative-với-postgresql-ngày-2026-11-19)
   và [slide Checkpoint 2](exports/GeoLife-Checkpoint-2.html).
+- **Đợt đầu trên Google Cloud (22/11):** triển khai API nội bộ trên GKE + Knative/Kourier,
+  kéo image private từ GHCR và nạp snapshot đầy đủ vào Cloud SQL for PostgreSQL. Sau khi Blue,
+  Green, canary và rollback qua kiểm tra, triển khai giao diện đặt xe và MLflow. Đã chuẩn bị
+  render manifest với image theo digest. Cần project và cụm GKE để chạy bản cloud.
+  [Hướng dẫn triển khai](docs/cp2-knative-deploy.md#postgresql-cho-bản-cloud)
 - Người dùng đã yêu cầu bỏ quy trình/checklist/gate mentor review/approval.
 
 ## 2. Cách làm việc người dùng muốn

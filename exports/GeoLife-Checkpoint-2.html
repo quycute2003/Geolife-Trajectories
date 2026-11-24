@@ -86,11 +86,17 @@
     .tag.accent { background: var(--coral-500); color: var(--text); }
 
     .table-wrap { align-self: center; overflow: hidden; }
-    table { width: 100%; border-spacing: 0; text-align: left; font-size: 30px; }
+    table { width: 100%; border-spacing: 0; table-layout: fixed; text-align: left; font-size: 30px; }
+    .function-column { width: 19%; }
+    .aws-column { width: 22%; }
+    .local-column { width: 25%; }
+    .cloud-column { width: 34%; }
     th, td { padding: 20px 28px; }
     thead { background: var(--teal-100); }
     th { color: var(--teal-700); }
     tr + tr td { border-top: 1px solid var(--border); }
+    th:last-child, td:last-child { border-left: 1px solid var(--border); }
+    td:last-child { background: var(--bg); }
 
     .mono-block { font-size: 30px; padding: 24px; background: var(--teal-100); border-radius: 20px; }
     .node { padding: 24px 32px; border: 1px solid var(--border); background: var(--bg); border-radius: 20px; }
@@ -169,14 +175,18 @@
 
     <section class="slide" aria-labelledby="title-3">
       <header><p class="eyebrow">Lựa chọn triển khai</p><h2 id="title-3">Kubernetes giữ được luồng phục vụ đã thiết kế trên AWS</h2></header>
-      <div class="table-wrap"><table><thead><tr><th scope="col">Chức năng</th><th scope="col">Thiết kế AWS</th><th scope="col">Bản local</th></tr></thead><tbody>
-        <tr><td>Chạy API</td><td>AWS Lambda</td><td>Kubernetes + Knative Serving</td></tr>
-        <tr><td>Nhận HTTP</td><td>API Gateway</td><td>Kourier</td></tr>
-        <tr><td>Chia traffic và rollback</td><td>Lambda versions / alias</td><td>Knative Revision / Route</td></tr>
-        <tr><td>Phân phối image</td><td>Amazon ECR</td><td>Kho image Docker Desktop</td></tr>
-        <tr><td>Lưu GPS</td><td>Amazon RDS for PostgreSQL</td><td>PostgreSQL local</td></tr>
-      </tbody></table></div>
-      <aside class="notes">Image Lambda đã được thử trong emulator và đẩy lên ECR. Tạo Lambda trên AWS gặp HTTP 403. Nhóm chuyển sang Docker Desktop để tiếp tục triển khai và thử luồng. Manifest YAML, kubectl và script rollout quản lý triển khai. Nhà cung cấp Kubernetes cloud chưa chốt.</aside>
+      <div class="table-wrap"><table>
+        <colgroup><col class="function-column"><col class="aws-column"><col class="local-column"><col class="cloud-column"></colgroup>
+        <thead><tr><th scope="col">Chức năng</th><th scope="col">Thiết kế AWS</th><th scope="col">Bản local</th><th scope="col">Google Cloud</th></tr></thead>
+        <tbody>
+          <tr><td>Chạy API</td><td>AWS Lambda</td><td>Kubernetes + Knative Serving</td><td>GKE + Knative Serving</td></tr>
+          <tr><td>Nhận HTTP</td><td>API Gateway</td><td>Kourier</td><td>Cloud Load Balancing (HTTPS)<br>Kourier cho Knative</td></tr>
+          <tr><td>Chia traffic và rollback</td><td>Lambda versions / alias</td><td>Knative Revision / Route</td><td>Knative Revision / Route</td></tr>
+          <tr><td>Phân phối image</td><td>Amazon ECR</td><td>Kho image Docker Desktop</td><td>GitHub Container Registry (GHCR)</td></tr>
+          <tr><td>Lưu GPS</td><td>Amazon RDS for PostgreSQL</td><td>PostgreSQL local</td><td>Cloud SQL for PostgreSQL</td></tr>
+        </tbody>
+      </table></div>
+      <aside class="notes">Image Lambda đã được thử trong emulator và đẩy lên ECR. Tạo Lambda trên AWS gặp HTTP 403. Nhóm chuyển sang Docker Desktop để tiếp tục triển khai và thử luồng. Trên Google Cloud, GKE là Google Kubernetes Engine. Cài Knative và Kourier trên GKE rồi tạo lại hai Revision. Cloud Load Balancing và HTTPS phục vụ lối vào public. API suy luận có thể để trong cụm, cho backend đặt xe gọi nội bộ qua Kourier. Đẩy image lên GHCR ở chế độ private. Kubernetes kéo image qua imagePullSecrets. Nạp snapshot GeoLife vào Cloud SQL for PostgreSQL. Hai Revision dùng chung DB và lấy cấu hình kết nối từ Kubernetes Secret.</aside>
     </section>
 
     <section class="slide" aria-labelledby="title-4">
@@ -290,7 +300,7 @@
     <section class="slide" aria-labelledby="title-9">
       <header><p class="eyebrow">Bước tiếp theo</p><h2 id="title-9">Bước tiếp theo là đưa API lên cloud và đo lượt dùng gợi ý</h2></header>
       <div class="two-col">
-        <article class="card"><span class="tag">Triển khai</span><h3>Kubernetes cloud</h3><ul><li>Đẩy image vào registry riêng.</li><li>Cấp PostgreSQL và endpoint HTTPS có xác thực.</li></ul></article>
+        <article class="card"><span class="tag">Triển khai</span><h3>Google Cloud</h3><ul><li>Đẩy image API lên GHCR.</li><li>Triển khai API trên GKE, kết nối Cloud SQL và cấu hình HTTPS.</li></ul></article>
         <article class="card"><span class="tag">Sản phẩm</span><h3>A/B trên giao diện đặt xe</h3><ul><li>Cân bằng hồ sơ và nhiệm vụ giữa hai nhóm.</li><li>Đo tỷ lệ phiên xác nhận bằng gợi ý.</li></ul></article>
       </div>
       <aside class="notes">Canary dùng để theo dõi phát hành, còn A/B giữ nhóm theo người thử để đo hành vi. Chỉ tính phiên xác nhận bằng gợi ý khi người thử giữ nguyên điểm đến. Mẫu số chính là các phiên mở bước chọn điểm đến. Đo thêm tỉ lệ dùng gợi ý trong các phiên đã xác nhận và loại fixture khỏi số liệu người thử.</aside>

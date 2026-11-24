@@ -165,8 +165,17 @@ snapshot `geolife-1.3-full-v1`.
 
 ## PostgreSQL cho bản cloud
 
-Nạp `geolife-1.3-full-v1` vào PostgreSQL từ máy có quyền ghi và có đường kết nối tới DB.
-Đặt `GEOLIFE_POSTGRES_DSN` cho tài khoản nạp dữ liệu rồi chạy tại thư mục repo:
+Đợt đầu triển khai API suy luận nội bộ trên **GKE + Knative Serving + Kourier**. Cloud SQL for
+PostgreSQL dùng IP riêng và nằm trong mạng mà GKE truy cập được. Giao diện đặt xe và MLflow
+triển khai sau khi kiểm tra API và rollout. Cần project Google Cloud có billing, một cụm GKE
+và một instance Cloud SQL for PostgreSQL đã tạo. [Kết nối GKE với Cloud SQL](https://docs.cloud.google.com/sql/docs/postgres/connect-kubernetes-engine)
+
+### Nạp snapshot vào Cloud SQL
+
+Chạy từ máy có đường mạng tới Cloud SQL, chẳng hạn máy nạp dữ liệu trong cùng VPC. Nếu dùng
+Cloud SQL Auth Proxy với IP riêng, máy chạy proxy cũng cần đường mạng tới IP đó. Đặt
+`GEOLIFE_POSTGRES_DSN` cho tài khoản nạp dữ liệu rồi chạy lệnh trong thư mục repo.
+[Kết nối bằng IP riêng](https://docs.cloud.google.com/sql/docs/postgres/configure-private-services-access)
 
 ```powershell
 .\.venv\Scripts\python.exe scripts/import_postgres.py --sqlite artifacts/cp2/sqlite-full/geolife.sqlite3
@@ -175,16 +184,156 @@ Nạp `geolife-1.3-full-v1` vào PostgreSQL từ máy có quyền ghi và có đ
 Script nạp GPS và 108 kết quả đã tính trong cùng một transaction. Chạy lại với cùng file
 và cùng snapshot ID dùng bản đã nạp. Dùng snapshot ID mới khi thay dữ liệu.
 
-Build image API cho PostgreSQL với `docker buildx build --target postgres` và push lên
-registry private. Dùng image theo digest trong `infra/knative/geolife-postgres.yaml`.
-Trong namespace `geolife-knative`, tạo Secret `geolife-postgres` với key `dsn` chứa DSN
-của tài khoản đọc. Cấp SELECT trên `geolife_gps_points` và `geolife_precomputed_inference`
-cho tài khoản API. Hai Revision dùng chung snapshot PostgreSQL.
+Cấp tài khoản API quyền kết nối database, `USAGE` schema `public` và `SELECT` trên
+`geolife_gps_points`, `geolife_precomputed_inference`. Tạo Secret `geolife-postgres` với key
+`dsn` từ DSN của tài khoản này. Dùng địa chỉ Cloud SQL mà pod truy cập được, với TLS cho kết nối
+trực tiếp. Hai Revision dùng chung snapshot `geolife-1.3-full-v1`.
 
-Kiểm tra user `101` và user `153` qua API v2 trên cả Blue và Green trước khi đổi traffic.
-Khi gọi `check_local_api.py --history` hoặc `knative_rollout.py sample`, truyền
-`--snapshot geolife-1.3-full-v1`. `/health` kiểm tra process API. Request v2 kiểm tra
-kết nối DB và dữ liệu thật.
+### Đưa image lên GHCR
+
+Trên máy chạy Docker, dùng bản source muốn triển khai. Đăng nhập `ghcr.io` với tài khoản có
+quyền publish package rồi build target `postgres`. Ví dụ dưới đây dành cho cụm GKE dùng node x86.
+[Xác thực với GHCR](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-to-the-container-registry)
+
+```powershell
+$repository = 'ghcr.io/quycute2003/geolife-inference'
+$tag = '0.2.0-postgres'
+$buildRecord = Join-Path $env:TEMP 'geolife-gke-build.json'
+docker buildx build --platform linux/amd64 --target postgres --push `
+  --tag "${repository}:$tag" --metadata-file $buildRecord .
+if ($LASTEXITCODE -ne 0) { throw 'Build hoặc push image thất bại.' }
+$digest = (Get-Content -Raw -LiteralPath $buildRecord | ConvertFrom-Json).'containerimage.digest'
+$image = "${repository}@$digest"
+```
+
+Giữ package ở chế độ private. Secret `geolife-ghcr` trong `geolife-knative` dùng credentials
+chỉ có quyền kéo image đã xuất bản. [Image private trên Knative](https://knative.dev/docs/serving/deploying-from-private-registry/)
+
+### Khởi tạo API trên GKE
+
+Lấy kubeconfig bằng `gcloud container clusters get-credentials` với cụm, location và project
+đã chọn. Đặt `$gkeCtx` theo `kubectl config get-contexts`. Dùng `kubectl --context $gkeCtx version`
+để chọn release Knative Serving và Kourier tương thích. Cài Serving CRDs và Serving core theo
+phần cài đặt phía trên, thay `docker-desktop` bằng `$gkeCtx`. Bản GKE kéo image từ GHCR nên
+không cần patch dành cho `dev.local`.
+[Lấy thông tin kết nối GKE](https://docs.cloud.google.com/kubernetes-engine/docs/how-to/cluster-access-for-kubectl)
+
+Với API nội bộ, dùng `ClusterIP` cho cả hai Service Kourier ngay khi cài. Manifest upstream đặt
+Service `kourier` ở chế độ `LoadBalancer`, có thể tạo một Cloud Load Balancer khi apply trên GKE.
+[Manifest Kourier](https://github.com/knative-extensions/net-kourier/blob/knative-v1.24.0/config/300-gateway.yaml)
+
+```powershell
+$py = '.\.venv\Scripts\python.exe'
+$kourierFile = Join-Path $env:TEMP "geolife-kourier-$knative.yaml"
+Invoke-WebRequest "https://github.com/knative-extensions/net-kourier/releases/download/$knative/kourier.yaml" -OutFile $kourierFile
+$kourier = & $py scripts/render_gke_api.py --kourier-manifest $kourierFile
+if ($LASTEXITCODE -ne 0) { throw 'Không render được Kourier cho API nội bộ.' }
+$kourier | kubectl --context $gkeCtx apply -f -
+if ($LASTEXITCODE -ne 0) { throw 'Không cài được Kourier.' }
+$ingressPatch = Join-Path $env:TEMP 'geolife-gke-config-network.json'
+'{"data":{"ingress-class":"kourier.ingress.networking.knative.dev"}}' | Set-Content -Encoding ascii $ingressPatch
+kubectl --context $gkeCtx -n knative-serving patch configmap config-network --type merge --patch-file $ingressPatch
+if ($LASTEXITCODE -ne 0) { throw 'Không cấu hình được ingress-class.' }
+kubectl --context $gkeCtx -n knative-serving rollout status deployment/webhook --timeout=180s
+if ($LASTEXITCODE -ne 0) { throw 'Knative webhook chưa sẵn sàng.' }
+kubectl --context $gkeCtx -n kourier-system rollout status deployment/3scale-kourier-gateway --timeout=180s
+if ($LASTEXITCODE -ne 0) { throw 'Kourier chưa sẵn sàng.' }
+```
+
+```powershell
+$ns = 'geolife-knative'
+$snapshot = 'geolife-1.3-full-v1'
+$gke = @('--context', $gkeCtx, '--namespace', $ns)
+kubectl --context $gkeCtx create namespace $ns --dry-run=client -o yaml |
+  kubectl --context $gkeCtx apply -f -
+if ($LASTEXITCODE -ne 0) { throw 'Không tạo được namespace API.' }
+```
+
+Tạo hai Secret trong namespace này. Nhập DSN của tài khoản đọc dữ liệu và token GHCR có quyền
+`read:packages`. Đoạn lệnh truyền nội dung Secret qua stdin cho `kubectl`.
+
+```powershell
+$dbDsn = Read-Host 'DSN Cloud SQL của tài khoản API' -AsSecureString
+$ghcrUser = Read-Host 'GitHub username có quyền đọc image'
+$ghcrToken = Read-Host 'GHCR token read:packages' -AsSecureString
+$dbCredential = [Net.NetworkCredential]::new('', $dbDsn)
+$registryCredential = [Net.NetworkCredential]::new($ghcrUser, $ghcrToken)
+$registryAuth = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes(
+  "${ghcrUser}:$($registryCredential.Password)"))
+$dockerConfig = @{ auths = @{ 'ghcr.io' = @{ auth = $registryAuth } } } | ConvertTo-Json -Depth 4 -Compress
+$dsnData = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($dbCredential.Password))
+$dockerData = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($dockerConfig))
+@{
+  apiVersion = 'v1'
+  kind = 'List'
+  items = @(
+    @{ apiVersion = 'v1'; kind = 'Secret'; metadata = @{ name = 'geolife-postgres'; namespace = $ns }
+       type = 'Opaque'; data = @{ dsn = $dsnData } },
+    @{ apiVersion = 'v1'; kind = 'Secret'; metadata = @{ name = 'geolife-ghcr'; namespace = $ns }
+       type = 'kubernetes.io/dockerconfigjson'; data = @{ '.dockerconfigjson' = $dockerData } }
+  )
+} | ConvertTo-Json -Depth 8 -Compress | kubectl @gke apply --server-side -f -
+$secretExit = $LASTEXITCODE
+Remove-Variable dbDsn, ghcrToken, dbCredential, registryCredential, registryAuth, dockerConfig, dsnData, dockerData
+if ($secretExit -ne 0) { throw 'Không tạo được Secret.' }
+```
+
+Manifest giữ API ở chế độ `cluster-local`. Đoạn apply dùng khi khởi tạo Blue lần đầu. Khi Blue và
+Green đã tồn tại, dùng các thao tác rollout để điều chỉnh traffic.
+
+```powershell
+$manifest = & $py scripts/render_gke_api.py --image $image
+if ($LASTEXITCODE -ne 0) { throw 'Không tạo được manifest GKE.' }
+$manifest | kubectl @gke apply --dry-run=server -f -
+if ($LASTEXITCODE -ne 0) { throw 'Manifest GKE không qua kiểm tra.' }
+$manifest | kubectl @gke apply -f -
+if ($LASTEXITCODE -ne 0) { throw 'Không triển khai được Blue.' }
+kubectl @gke wait --for=condition=Ready ksvc/geolife-inference --timeout=180s
+if ($LASTEXITCODE -ne 0) { throw 'Blue chưa sẵn sàng.' }
+```
+
+### Kiểm tra Blue, Green, canary và rollback
+
+Mở `kubectl --context $gkeCtx -n kourier-system port-forward svc/kourier-internal 18080:80`
+ở cửa sổ riêng. Đo bằng API v2 để kiểm tra kết nối DB và dữ liệu. `101` kiểm tra suy luận trực
+tiếp, `153` kiểm tra kết quả đã tính trước cho lịch sử dài.
+
+```powershell
+$rollout = @('--context', $gkeCtx, '--namespace', $ns, '--snapshot', $snapshot)
+$blue = 'heuristic-v1'
+$green = 'dbscan-v1'
+& $py scripts/knative_rollout.py stage @rollout
+if ($LASTEXITCODE -ne 0) { throw 'Không mở được preview Green.' }
+$route = kubectl @gke get route geolife-inference -o json | ConvertFrom-Json
+if ($LASTEXITCODE -ne 0) { throw 'Không đọc được Knative Route.' }
+$liveHost = ([uri]$route.status.url).Host
+$blueHost = ([uri](($route.status.traffic | Where-Object tag -eq 'blue').url)).Host
+$greenHost = ([uri](($route.status.traffic | Where-Object tag -eq 'green').url)).Host
+
+function Test-GeoLifeApi($routeHost, $model, $userId) {
+  & $py scripts/check_local_api.py --history --port 18080 --host-header $routeHost `
+    --snapshot $snapshot --expected "artifacts/pipeline/$model/$userId-$model.json"
+  if ($LASTEXITCODE -ne 0) { throw "API không khớp CLI cho $model, user $userId." }
+}
+
+foreach ($userId in '101', '153') {
+  Test-GeoLifeApi $blueHost $blue $userId
+  Test-GeoLifeApi $greenHost $green $userId
+}
+try {
+  & $py scripts/knative_rollout.py canary @rollout
+  if ($LASTEXITCODE -ne 0) { throw 'Không bật được canary.' }
+  & $py scripts/knative_rollout.py sample @rollout --requests 100
+  if ($LASTEXITCODE -ne 0) { throw 'Canary không qua kiểm tra.' }
+  & $py scripts/knative_rollout.py promote @rollout
+  if ($LASTEXITCODE -ne 0) { throw 'Không chuyển được toàn bộ traffic sang Green.' }
+  Test-GeoLifeApi $liveHost $green '101'
+} finally {
+  & $py scripts/knative_rollout.py rollback @rollout
+  if ($LASTEXITCODE -ne 0) { throw 'Rollback thất bại. Kiểm tra Knative Route.' }
+}
+Test-GeoLifeApi $liveHost $blue '101'
+```
 
 ## Chạy Blue và kiểm tra Green
 
