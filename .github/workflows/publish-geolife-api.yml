@@ -1,0 +1,41 @@
+name: Publish GeoLife PostgreSQL image
+
+on:
+  push:
+    branches:
+      - cp2-publish-api
+    paths:
+      - .github/workflows/publish-geolife-api.yml
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: 644b1432b0419ce98e186931af6b362f589b6fd0
+          persist-credentials: false
+      - name: Build and check PostgreSQL runtime
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/geolife-inference:0.2.0-postgres"
+          docker build --platform linux/amd64 --target postgres --tag "$image" \
+            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.revision=$(git rev-parse HEAD)" .
+          docker run --rm --entrypoint /app/.venv/bin/python "$image" \
+            -c 'import geolife_inference.api, psycopg; print("PostgreSQL runtime OK")'
+      - name: Publish and record image digest
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          repository="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/geolife-inference"
+          image="$repository:0.2.0-postgres"
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          docker push "$image"
+          digest=$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$image")
+          [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]
+          printf 'Image: %s@%s\n' "$repository" "$digest" | tee -a "$GITHUB_STEP_SUMMARY"
